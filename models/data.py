@@ -1,6 +1,8 @@
 import sys
 import os
 import argparse
+import numpy as np
+from sklearn.model_selection import train_test_split
 
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
 from common import *
@@ -10,7 +12,7 @@ def parse_commandline():
     parser.add_argument('dir', type=str,
                     help='Input directory containing clusters')
     parser.add_argument('--out_dir', type=str,
-                    help='Base directory where clusters and their majority prediction results will be saved. Leave empty to use input directory')
+                    help='Output directory to save numpy data. Ignore to use input directory')
     parser.add_argument('--pred_ext', type=str,
                         help='Extension of ss prediction files',
                         default=".sspfa")
@@ -22,22 +24,25 @@ def parse_commandline():
                         default="all")
     return parser.parse_args()
 
-def commands(args, predictions, assignment):
+def preprocess(args, predictions, assignment):
     classes = list(get_ss_q8())
-    majority = ""
+    freqs = np.zeros((1024,len(classes)))
     for i in range(len(assignment)):
-        consensus = dict.fromkeys(classes, 0)
         for prediction in predictions.values():
-            consensus[prediction[i]] += 1
-        majority += max(consensus, key=consensus.get)
-    id_split = assignment.id.split('_')
-    out_id = f"{id_split[0]}_{id_split[1]}_{args.methods}_majority"
-    return {out_id: majority}
+            freqs[i, ss_index(prediction[i])] += 1
+    max_class_freqs = freqs.max(axis=0)
+    normalized_freqs = np.divide(freqs, max_class_freqs, out=np.zeros_like(freqs), where=max_class_freqs!=0)
+    return normalized_freqs, onehot_encode(assignment.seq)
 
-
+def data_process(args, df, out_paths):
+    X_train, X_test, y_train, y_test = train_test_split(df.x, df.y, test_size=0.20)
+    write_npz(out_paths["train"], X_train, y_train)
+    write_npz(out_paths["test"], X_test, y_test)
+    write_npz(out_paths["all"], df.x, df.y)
+    
 def main():
     args = parse_commandline()
     predictors = choose_methods(args.methods)
-    work_on_majority(args, commands, predictors)
+    work_on_all_data(args, predictors, preprocess, data_process)
 
 main()
