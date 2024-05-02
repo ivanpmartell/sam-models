@@ -3,11 +3,12 @@ import os
 import argparse
 import torch
 from torch import nn
-import torch.nn.functional as F
 from torch.utils.data import TensorDataset, DataLoader
 
-sys.path.insert(1, os.path.join(sys.path[0], '..'))
+sys.path.insert(1, os.path.dirname(os.path.dirname(sys.path[0])))
+sys.path.insert(1, os.path.dirname(sys.path[0]))
 from common import *
+from nn_models import select_model
 
 def parse_commandline():
     parser = argparse.ArgumentParser(description='Optional app description')
@@ -15,42 +16,9 @@ def parse_commandline():
                     help='Input file containing data in npz format')
     parser.add_argument('--out_dir', type=str,
                     help='Base directory where trained parameters will be saved. Leave empty to use input directory')
+    parser.add_argument('--model', type=str, required=True,
+                    help='Type of neural network model to use')
     return parser.parse_args()
-
-class FCNN(nn.Module):
-    def __init__(self):
-      super(FCNN, self).__init__()
-      self.fc1 = nn.Linear(1024*9, 512*9)
-      self.fc2 = nn.Linear(512*9, 1024*9)
-
-    def forward(self, x):
-      x = x.reshape(x.shape[0], -1)
-      x = self.fc1(x)
-      x = F.relu(x)
-      x = self.fc2(x)
-      x = x.reshape(x.shape[0], 1024, 9)
-      output = F.log_softmax(x, dim=2)
-      return output
-    
-class ConvNet(nn.Module):
-    def __init__(self):
-      super(ConvNet, self).__init__()
-      self.conv = nn.Sequential(nn.Conv1d(in_channels=9,
-                                           out_channels=9, kernel_size=21),
-                                 nn.ReLU(),
-                                 nn.MaxPool1d(4))
-      self.hidden = nn.Sequential(nn.Linear(9*251, 2048),
-                                 nn.ReLU())
-      self.out = nn.Linear(2048, 1024*9)
-
-    def forward(self, x):
-      x = x.permute(0, 2, 1)
-      features = self.conv(x).squeeze(dim=-1)
-      features = features.reshape(features.shape[0], -1)
-      hidden = self.hidden(features)
-      out = self.out(hidden).reshape(x.shape[0], 1024, 9)
-      out = F.log_softmax(out, dim=2)
-      return out
 
 def train(dataloader, model, loss_fn, optimizer, device):
     size = len(dataloader.dataset)
@@ -100,7 +68,7 @@ def commands(args, X, y):
     tensor_y = torch.Tensor(y)
     ds = TensorDataset(tensor_x,tensor_y)
     train_dataloader = DataLoader(ds, batch_size=1)
-    model = ConvNet().to(device)
+    model = args.NNModel().to(device)
     loss_fn = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
     epochs = 20
@@ -112,6 +80,19 @@ def commands(args, X, y):
 
 def main():
     args = parse_commandline()
+    args.model = args.model.lower()
+    if args.model == "fullyconnected":
+        args.NNModel = FCNN
+    elif args.model == "convolutional":
+        args.NNModel = CNN
+    elif args.model == "recurrent":
+        args.NNModel = RNN
+    elif args.model == "transformer":
+        args.NNModel = TNN
+    else:
+        print("Incorrect model, please choose: FullyConnected, Convolutional, Recurrent, Transformer")
+        exit(1)
+
     work_on_training(args, commands)
 
 main()

@@ -2,7 +2,7 @@ import sys
 import os
 import argparse
 
-sys.path.insert(1, os.path.join(sys.path[0], '..'))
+sys.path.insert(1, os.path.dirname(os.path.dirname(sys.path[0])))
 from common import *
 
 def parse_commandline():

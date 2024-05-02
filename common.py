@@ -70,17 +70,22 @@ def keep_input_dir_structure(abs_input, abs_output, abs_directory, out_dir):
     f_out_dir = os.path.join(f_out_path, out_dir)
     return f_out_dir
 
+def missing_output_is_input(args, abs_input):
+    if not args.out_dir:
+        abs_output_dir = abs_input
+    else:
+        abs_output_dir = os.path.abspath(args.out_dir)
+    return abs_output_dir
+
 def work_on_majority(args, cmds, predictors):
     abs_input_dir = os.path.abspath(args.dir)
-    abs_output_dir = os.path.abspath(args.out_dir)
-    if not abs_output_dir:
-        abs_output_dir = abs_input_dir
+    abs_output_dir = missing_output_is_input(args, abs_input_dir)
     for f in Path(abs_input_dir).rglob(f"*{args.assign_ext}"):
         cluster_dir = os.path.dirname(f)
         f_basename = os.path.basename(f)
         protein = f_basename[0:f_basename.index('.')]
-        out_dir = keep_input_dir_structure(abs_input_dir, abs_output_dir, cluster_dir, "majority")
-        out_file = os.path.join(out_dir, f"{protein}_{args.methods}{args.pred_ext}")
+        out_dir = keep_input_dir_structure(abs_input_dir, abs_output_dir, cluster_dir, f"majority_{args.methods}")
+        out_file = os.path.join(out_dir, f"{protein}{args.pred_ext}")
         if not os.path.exists(out_file):
             predictions = dict()
             for predictor in predictors:
@@ -92,9 +97,7 @@ def work_on_majority(args, cmds, predictors):
 
 def work_on_all_data(args, predictors, preprocess, data_process):
     abs_input_dir = os.path.abspath(args.dir)
-    abs_output_dir = os.path.abspath(args.out_dir)
-    if not abs_output_dir:
-        abs_output_dir = abs_input_dir
+    abs_output_dir = missing_output_is_input(args, abs_input_dir)
     out_files = {"train": os.path.join(abs_output_dir, "train_data.npz"),
                  "test": os.path.join(abs_output_dir, "test_data.npz"),
                  "all": os.path.join(abs_output_dir, "data.npz")}
@@ -117,14 +120,22 @@ def work_on_all_data(args, predictors, preprocess, data_process):
 
 def work_on_training(args, cmds):
     abs_input = os.path.abspath(args.input)
-    if not args.out_dir:
-        abs_output_dir = os.path.dirname(abs_input)
-    else:
-        abs_output_dir = os.path.abspath(args.out_dir)
-    out_file = os.path.join(abs_output_dir, f"trained.params")
+    abs_output_dir = missing_output_is_input(args, os.path.dirname(abs_input))
+    out_file = os.path.join(abs_output_dir, f"{args.model}_trained.params")
     if not os.path.exists(out_file):
+        args.out_file = out_file
         X, y = load_npz(abs_input)
         cmds(args, X, y)
+        print("Training Done!")
+
+def work_on_testing(args, cmds):
+    if not os.path.exists(args.params):
+        print("Parameters file does not exist")
+        exit(1)
+    abs_input = os.path.abspath(args.input)
+    X, y = load_npz(abs_input)
+    cmds(args, X, y)
+    print("Testing Done!")
 
 #sequences are a dictionary of id -> sequence (str)
 def write_fasta(path, sequences):

@@ -4,8 +4,9 @@ import argparse
 from sklearn.ensemble import BaggingClassifier
 from sklearn.tree import ExtraTreeClassifier
 import numpy as np
+import pickle
 
-sys.path.insert(1, os.path.join(sys.path[0], '..'))
+sys.path.insert(1, os.path.dirname(os.path.dirname(sys.path[0])))
 from common import *
 
 def parse_commandline():
@@ -26,14 +27,14 @@ def transform_data(X, y):
             new_X[i*1024+j] = np.append(max_X, j)
             new_y[i*1024+j] = max_y[j]
     return new_X, new_y
-        
-    
-    return new_X, new_y
 
 def commands(args, X, y):
     X, y = transform_data(X, y)
+    # Load model
+    with open('model.pkl', 'rb') as f:
+        loaded_model = pickle.load(f)
     extra_tree = ExtraTreeClassifier()
-    cls = BaggingClassifier(extra_tree).fit(X, y)
+    cls = BaggingClassifier(extra_tree)
     print(cls.score(X, y))
     prediction = ""
     truth = ""
@@ -44,10 +45,10 @@ def commands(args, X, y):
         truth += q8_ss[int(y[i].item())]
     print(prediction)
     print(truth)
-    print("Done!")
 
 def main():
     args = parse_commandline()
+    args.model = "forest"
     work_on_training(args, commands)
 
 main()

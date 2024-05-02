@@ -4,7 +4,7 @@ import argparse
 import numpy as np
 from sklearn.model_selection import train_test_split
 
-sys.path.insert(1, os.path.join(sys.path[0], '..'))
+sys.path.insert(1, os.path.dirname(sys.path[0]))
 from common import *
 
 def parse_commandline():
