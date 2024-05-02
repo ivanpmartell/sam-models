@@ -77,22 +77,22 @@ def missing_output_is_input(args, abs_input):
         abs_output_dir = os.path.abspath(args.out_dir)
     return abs_output_dir
 
-def work_on_majority(args, cmds, predictors):
+def work_on_predicting(args, cmds, predictors):
     abs_input_dir = os.path.abspath(args.dir)
     abs_output_dir = missing_output_is_input(args, abs_input_dir)
-    for f in Path(abs_input_dir).rglob(f"*{args.assign_ext}"):
+    for f in Path(abs_input_dir).rglob(f"*{args.seq_ext}"):
         cluster_dir = os.path.dirname(f)
         f_basename = os.path.basename(f)
         protein = f_basename[0:f_basename.index('.')]
-        out_dir = keep_input_dir_structure(abs_input_dir, abs_output_dir, cluster_dir, f"majority_{args.methods}")
+        out_dir = keep_input_dir_structure(abs_input_dir, abs_output_dir, cluster_dir, f"{args.model}_{args.methods}")
         out_file = os.path.join(out_dir, f"{protein}{args.pred_ext}")
         if not os.path.exists(out_file):
             predictions = dict()
             for predictor in predictors:
                 prediction_path = os.path.join(cluster_dir, predictor, f"{protein}{args.pred_ext}")
                 predictions[predictor] = get_single_record_fasta(prediction_path)
-            assignment = get_single_record_fasta(f)
-            output = cmds(args, predictions, assignment)
+            #assignment = get_single_record_fasta(f)
+            output = cmds(args, predictions)
             write_fasta(out_file, output)
 
 def work_on_all_data(args, predictors, preprocess, data_process):

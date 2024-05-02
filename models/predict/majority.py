@@ -14,30 +14,33 @@ def parse_commandline():
     parser.add_argument('--pred_ext', type=str,
                         help='Extension of ss prediction files',
                         default=".sspfa")
-    parser.add_argument('--assign_ext', type=str,
+    parser.add_argument('--seq_ext', type=str,
                         help='Extension of ss assigned files',
-                        default=".ssfa")
+                        default=".fa")
     parser.add_argument('--methods', type=str,
                         help='Keyword or Comma separated list of methods to include in majority consensus prediction. Keywords: all, top, avg, low',
                         default="all")
     return parser.parse_args()
 
-def commands(args, predictions, assignment):
+def commands(args, predictions):
+    first_pred = next(iter(predictions.values()))
+    preds_len = len(first_pred.seq)
     classes = list(get_ss_q8())
     majority = ""
-    for i in range(len(assignment)):
+    for i in range(preds_len):
         consensus = dict.fromkeys(classes, 0)
         for prediction in predictions.values():
             consensus[prediction[i]] += 1
         majority += max(consensus, key=consensus.get)
-    id_split = assignment.id.split('_')
-    out_id = f"{id_split[0]}_{id_split[1]}_{args.methods}_majority"
+    id_split = first_pred.id.split('_')
+    out_id = f"{id_split[0]}_{id_split[1]}_{args.methods}_{args.model}"
     return {out_id: majority}
 
 
 def main():
     args = parse_commandline()
     predictors = choose_methods(args.methods)
-    work_on_majority(args, commands, predictors)
+    args.model = "majority"
+    work_on_predicting(args, commands, predictors)
 
 main()

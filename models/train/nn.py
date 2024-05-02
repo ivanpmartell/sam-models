@@ -8,7 +8,7 @@ from torch.utils.data import TensorDataset, DataLoader
 sys.path.insert(1, os.path.dirname(os.path.dirname(sys.path[0])))
 sys.path.insert(1, os.path.dirname(sys.path[0]))
 from common import *
-from nn_models import select_model
+from nn_models import select_model, select_device
 
 def parse_commandline():
     parser = argparse.ArgumentParser(description='Neural network training script')
@@ -37,30 +37,24 @@ def train(dataloader, model, loss_fn, optimizer, device):
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
 
 def commands(args, X, y):
-    device = (
-        "cuda"
-        if torch.cuda.is_available()
-        else "mps"
-        if torch.backends.mps.is_available()
-        else "cpu"
-    )
-    print(f"Using {device} device")
     tensor_x = torch.Tensor(X)
     tensor_y = torch.Tensor(y)
     ds = TensorDataset(tensor_x,tensor_y)
     train_dataloader = DataLoader(ds, batch_size=1)
-    model = args.NNModel().to(device)
+    model = args.NNModel().to(args.device)
     loss_fn = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
     epochs = 20
     for t in range(epochs):
         print(f"Epoch {t+1}\n-------------------------------")
-        train(train_dataloader, model, loss_fn, optimizer, device)
+        train(train_dataloader, model, loss_fn, optimizer, args.device)
     torch.save(model.state_dict(), args.out_file)
 
 def main():
     args = parse_commandline()
-    args.NNModel = select_model(args)
+    args.model = args.model.lower()
+    args.NNModel = select_model(args.model)
+    args.device = select_device()
     work_on_training(args, commands)
 
 main()

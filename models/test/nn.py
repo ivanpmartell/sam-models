@@ -8,7 +8,7 @@ from torch.utils.data import TensorDataset, DataLoader
 sys.path.insert(1, os.path.dirname(os.path.dirname(sys.path[0])))
 sys.path.insert(1, os.path.dirname(sys.path[0]))
 from common import *
-from nn_models import select_model
+from nn_models import select_model, select_device
 
 def parse_commandline():
     parser = argparse.ArgumentParser(description='Neural network testing script')
@@ -36,26 +36,20 @@ def test(dataloader, model, loss_fn, device):
     print(f"Test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
 
 def commands(args, X, y):
-    device = (
-        "cuda"
-        if torch.cuda.is_available()
-        else "mps"
-        if torch.backends.mps.is_available()
-        else "cpu"
-    )
-    print(f"Using {device} device")
     tensor_x = torch.Tensor(X)
     tensor_y = torch.Tensor(y)
     ds = TensorDataset(tensor_x,tensor_y)
     train_dataloader = DataLoader(ds, batch_size=1)
-    model = args.NNModel().to(device)
+    model = args.NNModel().to(args.device)
     loss_fn = nn.CrossEntropyLoss()
     model.load_state_dict(torch.load(args.params))
-    test(train_dataloader, model, loss_fn, device)
+    test(train_dataloader, model, loss_fn, args.device)
 
 def main():
     args = parse_commandline()
-    args.NNModel = select_model(args)
+    args.model = args.model.lower()
+    args.NNModel = select_model(args.model)
+    args.device = select_device()
     work_on_testing(args, commands)
 
 main()

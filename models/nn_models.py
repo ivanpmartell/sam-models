@@ -1,3 +1,4 @@
+import torch
 from torch import nn
 import torch.nn.functional as F
 
@@ -38,16 +39,26 @@ class CNN(nn.Module):
     
 
 
-def select_model(args):
-    args.model = args.model.lower()
-    if args.model == "fullyconnected":
+def select_model(model):
+    if model == "fullyconnected":
         return FCNN
-    elif args.model == "convolutional":
+    elif model == "convolutional":
         return CNN
-    elif args.model == "recurrent":
+    elif model == "recurrent":
         return RNN
-    elif args.model == "transformer":
+    elif model == "transformer":
         return TNN
     else:
         print("Incorrect model, please choose: FullyConnected, Convolutional, Recurrent, Transformer")
         exit(1)
+
+def select_device():
+    device = (
+        "cuda"
+        if torch.cuda.is_available()
+        else "mps"
+        if torch.backends.mps.is_available()
+        else "cpu"
+    )
+    print(f"Using {device} device")
+    return device

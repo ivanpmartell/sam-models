@@ -1,6 +1,7 @@
 .vscode
 *.npz
 *.params
+*.sspfa
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
