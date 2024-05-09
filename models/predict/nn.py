@@ -3,6 +3,7 @@ import os
 import argparse
 import torch
 from torch import nn
+import torch.nn.functional as F
 from torch.utils.data import TensorDataset, DataLoader
 
 sys.path.insert(1, os.path.dirname(os.path.dirname(sys.path[0])))
@@ -53,6 +54,7 @@ def commands(args, predictions):
     ss_q8 = get_ss_q8()
     with torch.no_grad():
         pred = model(X)
+        pred = F.log_softmax(pred, dim=2)
         for i in (pred.argmax(2))[0,:preds_len]:
             result += ss_q8[i]
     id_split = first_pred.id.split('_')

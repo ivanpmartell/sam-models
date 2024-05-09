@@ -32,7 +32,7 @@ def train(dataloader, model, loss_fn, optimizer, device):
         loss.backward()
         optimizer.step()
         optimizer.zero_grad()
-        if batch % 100 == 0:
+        if batch % 5 == 0:
             loss, current = loss.item(), (batch + 1) * len(X)
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
 
@@ -40,11 +40,11 @@ def commands(args, X, y):
     tensor_x = torch.Tensor(X)
     tensor_y = torch.Tensor(y)
     ds = TensorDataset(tensor_x,tensor_y)
-    train_dataloader = DataLoader(ds, batch_size=1)
+    train_dataloader = DataLoader(ds, batch_size=2)
     model = args.NNModel().to(args.device)
     loss_fn = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
-    epochs = 20
+    epochs = 10
     for t in range(epochs):
         print(f"Epoch {t+1}\n-------------------------------")
         train(train_dataloader, model, loss_fn, optimizer, args.device)
