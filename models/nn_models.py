@@ -104,6 +104,7 @@ class PosEncoding(nn.Module):
         return self.dropout(out)
 
 def select_model(model):
+    model = model.lower()
     if model == "fullyconnected":
         return FCNN
     elif model == "convolutional":

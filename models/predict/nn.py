@@ -63,7 +63,6 @@ def commands(args, predictions):
 
 def main():
     args = parse_commandline()
-    args.model = args.model.lower()
     args.NNModel = select_model(args.model)
     args.device = select_device()
     predictors = choose_methods(args.methods)

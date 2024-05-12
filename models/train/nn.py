@@ -52,7 +52,6 @@ def commands(args, X, y):
 
 def main():
     args = parse_commandline()
-    args.model = args.model.lower()
     args.NNModel = select_model(args.model)
     args.device = select_device()
     work_on_training(args, commands)

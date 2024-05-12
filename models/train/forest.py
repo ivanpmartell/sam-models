@@ -15,6 +15,8 @@ def parse_commandline():
                     help='Input file containing data in npz format')
     parser.add_argument('--out_dir', type=str,
                     help='Base directory where trained parameters will be saved. Leave empty to use input directory')
+    parser.add_argument('--model', type=str,
+                    help='Name to use for this model')
     return parser.parse_args()
 
 def transform_data(X, y):
@@ -37,7 +39,8 @@ def commands(args, X, y):
 
 def main():
     args = parse_commandline()
-    args.model = "forest"
+    if not args.model:
+        args.model = "forest"
     work_on_training(args, commands)
 
 main()

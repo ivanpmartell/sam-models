@@ -13,6 +13,10 @@ def parse_commandline():
     parser = argparse.ArgumentParser(description='Random forest testing script')
     parser.add_argument('input', type=str,
                     help='Input file containing data in npz format')
+    parser.add_argument('--out_dir', type=str,
+                    help='Base directory where scoring metric results will be saved. Leave empty to use params directory')
+    parser.add_argument('--model', type=str,
+                    help='Name to use for this model')
     parser.add_argument('--params', type=str, required=True,
                     help='Pretrained parameters file')
     return parser.parse_args()
@@ -32,11 +36,14 @@ def commands(args, X, y):
     X, y = transform_data(X, y)
     with open(args.params, 'rb') as f:
         cls = pickle.load(f)
-    print(f"Accuracy: {cls.score(X, y)}")
+    test_acc = cls.score(X, y)
+    print(f"Accuracy: {test_acc}")
+    return test_acc
 
 def main():
     args = parse_commandline()
-    args.model = "forest"
+    if not args.model:
+        args.model = "forest"
     work_on_testing(args, commands)
 
 main()

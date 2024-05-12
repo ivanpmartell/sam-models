@@ -14,6 +14,8 @@ def parse_commandline():
     parser = argparse.ArgumentParser(description='Neural network testing script')
     parser.add_argument('input', type=str,
                     help='Input file containing data in npz format')
+    parser.add_argument('--out_dir', type=str,
+                    help='Base directory where scoring metric results will be saved. Leave empty to use params directory')
     parser.add_argument('--model', type=str, required=True,
                     help='Type of neural network model to use')
     parser.add_argument('--params', type=str, required=True,
@@ -33,7 +35,9 @@ def test(dataloader, model, loss_fn, device):
             correct += (pred.argmax(2) == y.argmax(2)).type(torch.float).sum().item()
     test_loss /= num_batches
     correct /= size
-    print(f"Test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
+    test_acc = 100*correct
+    print(f"Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
+    return test_acc
 
 def commands(args, X, y):
     tensor_x = torch.Tensor(X)
@@ -43,11 +47,10 @@ def commands(args, X, y):
     model = args.NNModel().to(args.device)
     loss_fn = nn.CrossEntropyLoss()
     model.load_state_dict(torch.load(args.params))
-    test(train_dataloader, model, loss_fn, args.device)
+    return test(train_dataloader, model, loss_fn, args.device)
 
 def main():
     args = parse_commandline()
-    args.model = args.model.lower()
     args.NNModel = select_model(args.model)
     args.device = select_device()
     work_on_testing(args, commands)

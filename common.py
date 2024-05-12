@@ -6,6 +6,7 @@ from Bio.SeqRecord import SeqRecord
 from sklearn import preprocessing
 import pandas as pd
 import numpy as np
+from operator import add, sub
 
 def get_ss_q8():
     return "_BCEGHIST"
@@ -95,13 +96,18 @@ def work_on_predicting(args, cmds, predictors):
             output = cmds(args, predictions)
             write_fasta(out_file, output)
 
-def work_on_all_data(args, predictors, preprocess, data_process):
+def work_on_data(args, predictors, preprocess, data_process):
     abs_input_dir = os.path.abspath(args.dir)
     abs_output_dir = missing_output_is_input(args, abs_input_dir)
-    out_files = {"train": os.path.join(abs_output_dir, "train_data.npz"),
-                 "test": os.path.join(abs_output_dir, "test_data.npz"),
-                 "all": os.path.join(abs_output_dir, "data.npz")}
-    if not all([os.path.isfile(f) for f in out_files.values()]):
+    if args.split_type == "kfold":
+        out_files = {"kfold": os.path.join(abs_output_dir, "kfold{0}.npz")}
+        condition = any(fname.startswith("kfold") for fname in os.listdir(abs_output_dir)) if os.path.exists(abs_output_dir) else False
+    elif args.split_type == "train_test":
+        out_files = {"train": os.path.join(abs_output_dir, "train_data.npz"),
+                    "test": os.path.join(abs_output_dir, "test_data.npz"),
+                    "all": os.path.join(abs_output_dir, "data.npz")}
+        condition = all([os.path.isfile(f) for f in out_files.values()])
+    if not condition:
         training_data = []
         for f in Path(abs_input_dir).rglob(f"*{args.assign_ext}"):
             cluster_dir = os.path.dirname(f)
@@ -117,6 +123,8 @@ def work_on_all_data(args, predictors, preprocess, data_process):
             training_data.append(data)
         df = pd.DataFrame.from_dict(training_data)
         data_process(args, df, out_files)
+    else:
+        print("Skipped process since output files already exist")
 
 def work_on_training(args, cmds):
     abs_input = os.path.abspath(args.input)
@@ -129,12 +137,16 @@ def work_on_training(args, cmds):
         print("Training Done!")
 
 def work_on_testing(args, cmds):
+    args.params = os.path.abspath(args.params)
     if not os.path.exists(args.params):
         print("Parameters file does not exist")
         exit(1)
     abs_input = os.path.abspath(args.input)
+    abs_output_dir = missing_output_is_input(args, os.path.dirname(args.params))
     X, y = load_npz(abs_input)
-    cmds(args, X, y)
+    score = cmds(args, X, y)
+    with open(os.path.join(abs_output_dir, f"{args.model}_score.res"), 'w') as file:
+        file.write(str(score))
     print("Testing Done!")
 
 #sequences are a dictionary of id -> sequence (str)
@@ -162,3 +174,14 @@ def onehot_encode(X):
     X_encoded = enc.fit_transform(X_arr[:, np.newaxis]).toarray()
     X_padded = np.pad(X_encoded, ((0,1024-len(X_encoded)),(0,0)), 'constant')
     return X_padded
+
+def closest_divisor(n,m):
+    if n % m == 0:
+        return m
+    print("Split size given cannot divide the data equally.")
+    for i in range(1,100):
+        for f in (add,sub):
+            d = f(m,i)
+            if n%(d) == 0:
+                print(f"Using closest split size: {d}")
+                return d

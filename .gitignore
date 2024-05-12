@@ -2,6 +2,7 @@
 *.npz
 *.params
 *.sspfa
+*.res
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
