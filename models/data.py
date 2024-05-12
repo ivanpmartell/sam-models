@@ -53,6 +53,8 @@ def train_test(df, out_paths, split=0.20):
 def kfold(df, out_paths, split=3):
     data_len = len(df.x)
     usable_split = closest_divisor(data_len, split)
+    if usable_split != split:
+        exit(2)
     Xs  = np.split(df.x, usable_split)
     Ys = np.split(df.y, usable_split)
     for i in range(usable_split):

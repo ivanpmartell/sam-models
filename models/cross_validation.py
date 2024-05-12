@@ -43,7 +43,7 @@ def pipeline(args):
     current_path = os.path.dirname(os.path.realpath(sys.argv[0]))
     abs_out_dir = os.path.abspath(args.out_dir)
     data_dir = os.path.join(abs_out_dir, "data")
-    subprocess.call(['python', os.path.join(current_path, 'data.py'), args.input, '--out_dir', data_dir, '--split_type', 'kfold', '--split_size', args.split_size, '--methods', args.methods])
+    subprocess.check_call(['python', os.path.join(current_path, 'data.py'), args.input, '--out_dir', data_dir, '--split_type', 'kfold', '--split_size', args.split_size, '--methods', args.methods])
     # loop for train and test (leave one out) for each fold
     fold_list = list(range(int(args.split_size)))
     for i in fold_list:

@@ -184,5 +184,5 @@ def closest_divisor(n,m):
         for f in (add,sub):
             d = f(m,i)
             if n%(d) == 0:
-                print(f"Using closest split size: {d}")
+                print(f"Closest split size: {d}")
                 return d
