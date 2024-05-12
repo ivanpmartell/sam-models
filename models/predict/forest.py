@@ -10,7 +10,7 @@ sys.path.insert(1, os.path.dirname(os.path.dirname(sys.path[0])))
 from common import *
 
 def parse_commandline():
-    parser = argparse.ArgumentParser(description='Optional app description')
+    parser = argparse.ArgumentParser(description='Mutation secondary structure forest predictor')
     parser.add_argument('dir', type=str,
                     help='Input directory containing clusters')
     parser.add_argument('--out_dir', type=str,
@@ -48,7 +48,7 @@ def commands(args, predictions):
         cls = pickle.load(f)
     result = ""
     q8_ss = get_ss_q8()
-    for i in range(485):
+    for i in range(preds_len):
         y_hat = cls.predict(X[i].reshape(1, -1))
         result += q8_ss[int(y_hat.item())]
     id_split = first_pred.id.split('_')

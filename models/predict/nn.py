@@ -12,7 +12,7 @@ from common import *
 from nn_models import select_model, select_device
 
 def parse_commandline():
-    parser = argparse.ArgumentParser(description='Optional app description')
+    parser = argparse.ArgumentParser(description='Mutation secondary structure neural network predictor')
     parser.add_argument('dir', type=str,
                     help='Input directory containing clusters')
     parser.add_argument('--out_dir', type=str,

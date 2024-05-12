@@ -8,7 +8,7 @@ sys.path.insert(1, os.path.dirname(sys.path[0]))
 from common import *
 
 def parse_commandline():
-    parser = argparse.ArgumentParser(description='Optional app description')
+    parser = argparse.ArgumentParser(description='Script to preprocess data for machine learning use')
     parser.add_argument('dir', type=str,
                     help='Input directory containing clusters')
     parser.add_argument('--out_dir', type=str,
