@@ -15,7 +15,7 @@ def parse_commandline():
                     help='Input file containing data in npz format')
     parser.add_argument('--out_dir', type=str,
                     help='Base directory where scoring metric results will be saved. Leave empty to use params directory')
-    parser.add_argument('--model', type=str,
+    parser.add_argument('--model', type=str, default="forest",
                     help='Name to use for this model')
     parser.add_argument('--params', type=str, required=True,
                     help='Pretrained parameters file')
@@ -42,8 +42,6 @@ def commands(args, X, y):
 
 def main():
     args = parse_commandline()
-    if not args.model:
-        args.model = "forest"
     work_on_testing(args, commands)
 
 main()
