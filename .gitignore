@@ -3,6 +3,7 @@
 *.params
 *.sspfa
 *.res
+*.score
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

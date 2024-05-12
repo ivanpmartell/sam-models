@@ -48,28 +48,32 @@ def pipeline(args):
     fold_list = list(range(int(args.split_size)))
     for i in fold_list:
         fold_dir = os.path.join(abs_out_dir, f"fold{i}")
-        train_data_path = os.path.join(fold_dir, "train_data.npz")
+        train_data_path = os.path.join(fold_dir, f"{args.methods}_train.npz")
         if not os.path.isfile(train_data_path):
             train_folds = fold_list[:i] + fold_list[i+1 :]
-            train_data = [load_npz(os.path.join(data_dir, f"kfold{train_fold}.npz")) for train_fold in train_folds]
+            train_data = [load_npz(os.path.join(data_dir, f"{args.methods}_kfold{train_fold}.npz")) for train_fold in train_folds]
             X_train = train_data[0][0]
             y_train = train_data[0][1]
             for j in range(1, len(train_data)):
                 X_train = np.concatenate([X_train, train_data[j][0]])
                 y_train = np.concatenate([y_train, train_data[j][1]])
             write_npz(train_data_path, X_train, y_train)
-        test_data_path = os.path.join(fold_dir, "test_data.npz")
+        test_data_path = os.path.join(fold_dir, f"{args.methods}_test.npz")
         if not os.path.isfile(test_data_path):
             test_fold = fold_list[i]
-            X_test, y_test = load_npz(os.path.join(data_dir, f"kfold{test_fold}.npz"))
+            X_test, y_test = load_npz(os.path.join(data_dir, f"{args.methods}_kfold{test_fold}.npz"))
             write_npz(test_data_path, X_test, y_test)
         # Training
         script_path = os.path.join(current_path, select_model(args.model))
         subprocess.call(['python', script_path.format("train"), train_data_path, '--out_dir', fold_dir, "--model", args.model])
         # Testing
-        params_path = os.path.join(current_path, os.path.join(fold_dir, f"{args.model}_trained.params"))
+        params_path = os.path.join(fold_dir, f"{args.model}_trained.params")
         subprocess.call(['python', script_path.format("test"), test_data_path, '--params', params_path, "--model", args.model])
+        os.rename(params_path, os.path.join(fold_dir, f"{args.model}_{args.methods}.params"))
+        scores_path = os.path.join(fold_dir, f"{args.model}_score.res")
+        os.rename(scores_path, os.path.join(fold_dir, f"{args.model}_{args.methods}.score"))
     #print and save file with agglomerated results of complete cross-validation
+
 
 
 def main():

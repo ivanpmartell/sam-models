@@ -100,12 +100,13 @@ def work_on_data(args, predictors, preprocess, data_process):
     abs_input_dir = os.path.abspath(args.dir)
     abs_output_dir = missing_output_is_input(args, abs_input_dir)
     if args.split_type == "kfold":
-        out_files = {"kfold": os.path.join(abs_output_dir, "kfold{0}.npz")}
-        condition = any(fname.startswith("kfold") for fname in os.listdir(abs_output_dir)) if os.path.exists(abs_output_dir) else False
+        fname_prefix = f"{args.methods}_kfold"
+        out_files = {"kfold": os.path.join(abs_output_dir, fname_prefix + "{0}.npz")}
+        condition = any(fname.startswith(fname_prefix) for fname in os.listdir(abs_output_dir)) if os.path.exists(abs_output_dir) else False
     elif args.split_type == "train_test":
-        out_files = {"train": os.path.join(abs_output_dir, "train_data.npz"),
-                    "test": os.path.join(abs_output_dir, "test_data.npz"),
-                    "all": os.path.join(abs_output_dir, "data.npz")}
+        out_files = {"train": os.path.join(abs_output_dir, f"{args.methods}_train.npz"),
+                    "test": os.path.join(abs_output_dir, f"{args.methods}_test.npz"),
+                    "all": os.path.join(abs_output_dir, f"{args.methods}_data.npz")}
         condition = all([os.path.isfile(f) for f in out_files.values()])
     if not condition:
         training_data = []
