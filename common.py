@@ -96,7 +96,7 @@ def work_on_predicting(args, cmds, predictors):
             output = cmds(args, predictions)
             write_fasta(out_file, output)
 
-def work_on_data(args, predictors, preprocess, data_process):
+def work_on_data(args, predictors, X_preprocess, y_preprocess, data_process):
     abs_input_dir = os.path.abspath(args.dir)
     abs_output_dir = missing_output_is_input(args, abs_input_dir)
     if args.split_type == "kfold":
@@ -111,6 +111,7 @@ def work_on_data(args, predictors, preprocess, data_process):
     if not condition:
         training_data = []
         for f in Path(abs_input_dir).rglob(f"*{args.assign_ext}"):
+            #TODO:Get mutation locations from file
             cluster_dir = os.path.dirname(f)
             f_basename = os.path.basename(f)
             protein = f_basename[0:f_basename.index('.')]
@@ -119,7 +120,8 @@ def work_on_data(args, predictors, preprocess, data_process):
                 prediction_path = os.path.join(cluster_dir, predictor, f"{protein}{args.pred_ext}")
                 predictions[predictor] = get_single_record_fasta(prediction_path)
             assignment = get_single_record_fasta(f)
-            x, y = preprocess(args, predictions, assignment)
+            x = X_preprocess(predictions)
+            y = y_preprocess(assignment.seq)
             data = {"x": x, "y": y}
             training_data.append(data)
         df = pd.DataFrame.from_dict(training_data)
@@ -168,13 +170,6 @@ def load_npz(path):
     X = np.vstack(loaded["a"]).astype(float).reshape((len(loaded["a"]), 1024, 9))
     y = np.vstack(loaded["b"]).astype(float).reshape((len(loaded["b"]), 1024, 9))
     return X, y
-
-def onehot_encode(X):
-    X_arr = np.array(list(X))
-    enc = preprocessing.OneHotEncoder(categories=[list(get_ss_q8())])
-    X_encoded = enc.fit_transform(X_arr[:, np.newaxis]).toarray()
-    X_padded = np.pad(X_encoded, ((0,1024-len(X_encoded)),(0,0)), 'constant')
-    return X_padded
 
 def closest_divisor(n,m):
     if n % m == 0:

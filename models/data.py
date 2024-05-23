@@ -20,7 +20,7 @@ def parse_commandline():
                         help='Extension of ss assigned files',
                         default=".ssfa")
     parser.add_argument('--methods', type=str,
-                        help='Keyword or Comma separated list of methods to include in majority consensus prediction. Keywords: all, top, avg, low',
+                        help='Keyword or Comma separated list of methods to include in prediction. Keywords: all, top, avg, low',
                         default="all")
     parser.add_argument('--split_type', type=str,
                         help='Method of splitting the data. Keywords: kfold, train_test',
@@ -28,21 +28,44 @@ def parse_commandline():
     parser.add_argument('--split_size', type=str,
                         help='Amount of data to split. Values: kfold=1 to 100, train_test=0 to 1',
                         default="0.20")
+    parser.add_argument('--preprocess', type=str,
+                        help='Type of preprocessing to be done on input data. Options: nominal, onehot, frequency',
+                        default="frequency")
     return parser.parse_args()
 
-def preprocess(args, predictions, assignment):
+def onehot_encode(X):
+    X_arr = np.array(list(X))
+    enc = preprocessing.OneHotEncoder(categories=[list(get_ss_q8())])
+    X_encoded = enc.fit_transform(X_arr[:, np.newaxis]).toarray()
+    X_padded = np.pad(X_encoded, ((0,1024-len(X_encoded)),(0,0)), 'constant')
+    return X_padded
+
+def frequency_preprocess(predictions):
     classes = list(get_ss_q8())
     freqs = np.zeros((1024,len(classes)))
-    for i in range(len(assignment)):
+    seqs_len = len(next(iter(predictions.values())))
+    for i in range(seqs_len):
         for prediction in predictions.values():
             freqs[i, ss_index(prediction[i])] += 1
     max_class_freqs = freqs.max(axis=0)
     normalized_freqs = np.divide(freqs, max_class_freqs, out=np.zeros_like(freqs), where=max_class_freqs!=0)
-    return normalized_freqs, onehot_encode(assignment.seq)
+    return normalized_freqs
 
-#input data as separate onehot encodings concatenated
+def nominal_preprocess(predictions):
+    cats = np.zeros((1024*len(predictions),))
+    for i, prediction in enumerate(predictions.values()):
+        for j in range(len(prediction)):
+            cats[1024*i+j] = ss_index(prediction[j])
+    return cats
 
-#input data as mutation centered
+def onehot_preprocess(predictions):
+    classes = list(get_ss_q8())
+    concated = np.zeros((1024*len(predictions),len(classes)))
+    for i, prediction in enumerate(predictions.values()):
+        concated[i*1024:(i+1)*1024] = onehot_encode(prediction)
+    return concated
+
+#input data as mutation centered (requires mutation location knowledge)
 
 def train_test(df, out_paths, split=0.20):
     X_train, X_test, y_train, y_test = train_test_split(df.x, df.y, test_size=split)
@@ -69,10 +92,21 @@ def data_process(args, df, out_paths):
     else:
         print("Uknown splitting method")
         exit(1)
-    
+
+def choose_preprocess(type):
+    if type == "nominal":
+        return nominal_preprocess
+    elif type == "onehot":
+        return onehot_preprocess
+    elif type == "frequency":
+        return frequency_preprocess
+    else:
+        raise ValueError("Unknown preprocessing type given in command arguments")
+
 def main():
     args = parse_commandline()
     predictors = choose_methods(args.methods)
-    work_on_data(args, predictors, preprocess, data_process)
+    preprocessor = choose_preprocess(args.preprocess)
+    work_on_data(args, predictors, preprocessor, onehot_encode, data_process)
 
 main()
