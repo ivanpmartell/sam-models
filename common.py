@@ -120,8 +120,8 @@ def work_on_data(args, predictors, X_preprocess, y_preprocess, data_process):
                 prediction_path = os.path.join(cluster_dir, predictor, f"{protein}{args.pred_ext}")
                 predictions[predictor] = get_single_record_fasta(prediction_path)
             assignment = get_single_record_fasta(f)
-            x = X_preprocess(predictions)
-            y = y_preprocess(assignment.seq)
+            x = X_preprocess(predictions.values())
+            y = y_preprocess([assignment])
             data = {"x": x, "y": y}
             training_data.append(data)
         df = pd.DataFrame.from_dict(training_data)
@@ -165,10 +165,18 @@ def write_npz(path, x, y):
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(path, a=x, b=y)
 
-def load_npz(path):
+def load_npz(path, x_preprocess="frequency", y_preprocess="oneshot"):
     loaded = np.load(path, allow_pickle=True)
-    X = np.vstack(loaded["a"]).astype(float).reshape((len(loaded["a"]), 1024, 9))
-    y = np.vstack(loaded["b"]).astype(float).reshape((len(loaded["b"]), 1024, 9))
+    if x_preprocess == "oneshot":
+        X = np.vstack(loaded["a"]).astype(float).reshape((len(loaded["a"]), -1, 9))
+    elif x_preprocess == "frequency":
+         X = np.vstack(loaded["a"]).astype(float).reshape((len(loaded["a"]), 1024, 9))
+    elif x_preprocess == "nominal":
+        X = np.vstack(loaded["a"]).astype(float)
+    if y_preprocess == "oneshot" or y_preprocess == "frequency":
+        y = np.vstack(loaded["b"]).astype(float).reshape((len(loaded["b"]), 1024, 9))
+    elif y_preprocess == "nominal":
+        y = np.hstack(loaded["b"]).astype(float)
     return X, y
 
 def closest_divisor(n,m):
