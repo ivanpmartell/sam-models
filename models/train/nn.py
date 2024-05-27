@@ -40,7 +40,7 @@ def train(dataloader, model, loss_fn, optimizer, best_accuracy, device):
 def evaluate(model, X_test, y_test):
     model.eval()
     y_pred = model(X_test)
-    acc = (y_pred.round() == y_test).float().mean()
+    acc = (y_pred.argmax(2) == y_test.argmax(2)).type(torch.float).mean().item()
     acc = float(acc) * 100
     return acc
 
@@ -48,7 +48,7 @@ def commands(args, X, y):
     tensor_x = torch.Tensor(X)
     tensor_y = torch.Tensor(y)
     ds = TensorDataset(tensor_x,tensor_y)
-    train_set, test_set = random_split(ds, [0.7, 0.3])
+    train_set, test_set = random_split(ds, [0.5, 0.5])
     train_dataloader = DataLoader(train_set, shuffle=True, batch_size=16)
     X_test, y_test = default_collate(test_set)
     model = args.NNModel().to(args.device)
