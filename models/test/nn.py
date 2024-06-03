@@ -8,7 +8,7 @@ from torch.utils.data import TensorDataset, DataLoader
 sys.path.insert(1, os.path.dirname(os.path.dirname(sys.path[0])))
 sys.path.insert(1, os.path.dirname(sys.path[0]))
 from common import *
-from nn_models import select_model, select_device
+from nn_models import select_model, select_device, CustomDataset
 
 def parse_commandline():
     parser = argparse.ArgumentParser(description='Neural network testing script')
@@ -36,13 +36,11 @@ def test(dataloader, model, loss_fn, device):
     test_loss /= num_batches
     correct /= size
     test_acc = 100*correct
-    print(f"Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
+    print(f"Accuracy: {(test_acc):>0.1f}%, Avg loss: {test_loss:>8f} \n")
     return test_acc
 
 def commands(args, X, y):
-    tensor_x = torch.Tensor(X)
-    tensor_y = torch.Tensor(y)
-    ds = TensorDataset(tensor_x,tensor_y)
+    ds = CustomDataset(X, y, x_transform=frequency_preprocess, y_transform=onehot_preprocess)
     train_dataloader = DataLoader(ds, batch_size=1)
     model = args.NNModel().to(args.device)
     loss_fn = nn.CrossEntropyLoss()

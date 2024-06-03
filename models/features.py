@@ -30,7 +30,9 @@ def choose_test(test):
 
 def process(args, test_type):
     abs_input = os.path.abspath(args.input)
-    X, y = load_npz(abs_input, "nominal", "nominal")
+    X, y = load_npz(abs_input)
+    X = nominal_location_preprocess(X)
+    y = single_target_preprocess(y)
     fs = SelectKBest(score_func=test_type, k='all')
     fs.fit(X, y)
     X_train_fs = fs.transform(X)

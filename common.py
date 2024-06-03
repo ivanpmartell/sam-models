@@ -43,6 +43,17 @@ def get_avg_predictors():
 def get_low_predictors():
     return ["raptorx", "rgn2", "spot1d_single"]
 
+def closest_divisor(n,m):
+    if n % m == 0:
+        return m
+    print("Split size given cannot divide the data equally.")
+    for i in range(1,100):
+        for f in (add,sub):
+            d = f(m,i)
+            if n%(d) == 0:
+                print(f"Closest split size: {d}")
+                return d
+
 def choose_methods(methods):
     if methods == "all":
         return get_all_predictors()
@@ -59,11 +70,17 @@ def choose_methods(methods):
         else:
             raise ValueError("Unknown method or wrong method format in command arguments")
 
-def read_fasta(f):
-    return list(SeqIO.parse(f, "fasta"))
-
-def get_single_record_fasta(f):
-    return read_fasta(f)[0]
+def choose_preprocess(type):
+    if type == "nominal":
+        return nominal_preprocess
+    if type == "nominal_location":
+        return nominal_location_preprocess
+    elif type == "onehot":
+        return onehot_preprocess
+    elif type == "frequency":
+        return frequency_preprocess
+    else:
+        raise ValueError("Unknown preprocessing type given in command arguments")
 
 def keep_input_dir_structure(abs_input, abs_output, abs_directory, out_dir):
     abs_directory_no_root_folder = abs_directory[len(abs_input.rstrip('/'))+1:]
@@ -96,7 +113,7 @@ def work_on_predicting(args, cmds, predictors):
             output = cmds(args, predictions)
             write_fasta(out_file, output)
 
-def work_on_data(args, predictors, X_preprocess, y_preprocess, data_process):
+def work_on_data(args, predictors, data_process):
     abs_input_dir = os.path.abspath(args.dir)
     abs_output_dir = missing_output_is_input(args, abs_input_dir)
     if args.split_type == "kfold":
@@ -120,8 +137,8 @@ def work_on_data(args, predictors, X_preprocess, y_preprocess, data_process):
                 prediction_path = os.path.join(cluster_dir, predictor, f"{protein}{args.pred_ext}")
                 predictions[predictor] = get_single_record_fasta(prediction_path)
             assignment = get_single_record_fasta(f)
-            x = X_preprocess(predictions.values())
-            y = y_preprocess([assignment])
+            x = nominal_preprocess(predictions.values(), np.uint8)
+            y = nominal_preprocess([assignment.seq], np.uint8)
             data = {"x": x, "y": y}
             training_data.append(data)
         df = pd.DataFrame.from_dict(training_data)
@@ -152,7 +169,14 @@ def work_on_testing(args, cmds):
         file.write(str(score))
     print("Testing Done!")
 
-#sequences are a dictionary of id -> sequence (str)
+### Data functions below
+def read_fasta(f):
+    return list(SeqIO.parse(f, "fasta"))
+
+def get_single_record_fasta(f):
+    return read_fasta(f)[0]
+
+#sequences input are a dictionary of id -> sequence (str)
 def write_fasta(path, sequences):
     out_sequences = []
     for seq_id, seq in sequences.items():
@@ -165,27 +189,67 @@ def write_npz(path, x, y):
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(path, a=x, b=y)
 
-def load_npz(path, x_preprocess="frequency", y_preprocess="oneshot"):
+def load_npz(path):
     loaded = np.load(path, allow_pickle=True)
-    if x_preprocess == "oneshot":
-        X = np.vstack(loaded["a"]).astype(float).reshape((len(loaded["a"]), -1, 9))
-    elif x_preprocess == "frequency":
-         X = np.vstack(loaded["a"]).astype(float).reshape((len(loaded["a"]), 1024, 9))
-    elif x_preprocess == "nominal":
-        X = np.vstack(loaded["a"]).astype(float)
-    if y_preprocess == "oneshot" or y_preprocess == "frequency":
-        y = np.vstack(loaded["b"]).astype(float).reshape((len(loaded["b"]), 1024, 9))
-    elif y_preprocess == "nominal":
-        y = np.hstack(loaded["b"]).astype(float)
+    X = np.vstack(loaded["a"]).astype(np.uint8)
+    y = np.vstack(loaded["b"]).astype(np.uint8)
     return X, y
 
-def closest_divisor(n,m):
-    if n % m == 0:
-        return m
-    print("Split size given cannot divide the data equally.")
-    for i in range(1,100):
-        for f in (add,sub):
-            d = f(m,i)
-            if n%(d) == 0:
-                print(f"Closest split size: {d}")
-                return d
+def onehot_encode(X):
+    X_arr = np.array(list(X))
+    enc = preprocessing.OneHotEncoder(categories=[list(get_ss_q8())])
+    X_encoded = enc.fit_transform(X_arr[:, np.newaxis]).toarray()
+    X_padded = np.pad(X_encoded, ((0,1024-len(X_encoded)),(0,0)), 'constant')
+    return X_padded
+
+def onehot_preprocess(X):
+    classes = list(get_ss_q8())
+    concated = np.zeros((1024*len(X),len(classes)))
+    for i, prediction in enumerate(X):
+        concated[i*1024:(i+1)*1024] = onehot_encode(prediction)
+    return concated
+
+def frequency_preprocess(X):
+    len_predictors = X.shape[-1]//1024
+    len_classes = len(get_ss_q8())
+    freqs = np.zeros((len(X), 1024, len_classes))
+    for i in range(len(X)):
+        for j in range(1024):
+            for k in range(len_predictors):
+                freqs[i, j, X[i,1024*k+j]] += 1
+    max_class_freqs = np.full((len(X), 1024, 1), 9, dtype=np.int8)
+    freqs = np.divide(freqs, max_class_freqs, out=np.zeros_like(freqs), where=max_class_freqs!=0)
+    return freqs
+
+def frequency_max_location_preprocess(X):
+    len_predictors = X.shape[-1]//1024
+    len_classes = len(get_ss_q8())
+    freqs = np.zeros((len(X), 1024, len_classes))
+    for i in range(len(X)):
+        for j in range(1024):
+            for k in range(len_predictors):
+                freqs[i, j, X[i,1024*k+j]] += 1
+    freqs = np.argmax(freqs,axis=2)
+    location = np.tile(np.arange(1, 1025, dtype=np.int16), len(X))
+    freqs = np.repeat(freqs, repeats=1024, axis=0)
+    freqs = np.c_[freqs, location]
+    return freqs
+
+def nominal_preprocess(X, numtype=float):
+    cats = np.zeros((1024*len(X),), dtype=numtype)
+    for i, prediction in enumerate(X):
+        for j in range(len(prediction)):
+            cats[1024*i+j] = ss_index(prediction[j])
+    return cats
+
+def nominal_location_preprocess(X):
+    X_len, _ = X.shape
+    location = np.tile(np.arange(1, 1025, dtype=np.int16), X_len)
+    X = np.repeat(X, repeats=1024, axis=0)
+    X = np.c_[X, location]
+    return X
+
+def single_target_preprocess(y):
+    return y.ravel().astype(float)
+
+#input data as mutation centered (requires mutation location knowledge)

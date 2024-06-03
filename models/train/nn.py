@@ -9,7 +9,7 @@ from torch.utils.data import TensorDataset, DataLoader, random_split, default_co
 sys.path.insert(1, os.path.dirname(os.path.dirname(sys.path[0])))
 sys.path.insert(1, os.path.dirname(sys.path[0]))
 from common import *
-from nn_models import select_model, select_device
+from nn_models import select_model, select_device, CustomDataset
 
 def parse_commandline():
     parser = argparse.ArgumentParser(description='Neural network training script')
@@ -21,7 +21,7 @@ def parse_commandline():
                     help='Type of neural network model to use')
     return parser.parse_args()
 
-def train(dataloader, model, loss_fn, optimizer, best_accuracy, device):
+def train(dataloader, model, loss_fn, optimizer, device):
     size = len(dataloader.dataset)
     model.train()
     for batch, (X, y) in enumerate(dataloader):
@@ -45,10 +45,8 @@ def evaluate(model, X_test, y_test):
     return acc
 
 def commands(args, X, y):
-    tensor_x = torch.Tensor(X)
-    tensor_y = torch.Tensor(y)
-    ds = TensorDataset(tensor_x,tensor_y)
-    train_set, test_set = random_split(ds, [0.5, 0.5])
+    ds = CustomDataset(X, y, x_transform=frequency_preprocess, y_transform=onehot_preprocess)
+    train_set, test_set = random_split(ds, [0.9, 0.1])
     train_dataloader = DataLoader(train_set, shuffle=True, batch_size=16)
     X_test, y_test = default_collate(test_set)
     model = args.NNModel().to(args.device)
@@ -61,7 +59,7 @@ def commands(args, X, y):
     best_epoch = -1
     for cur_epoch in range(epochs):
         print(f"Epoch {cur_epoch+1}\n-------------------------------")
-        train(train_dataloader, model, loss_fn, optimizer, best_accuracy, args.device)
+        train(train_dataloader, model, loss_fn, optimizer, args.device)
         acc = evaluate(model, X_test, y_test)
         print(f"End of epoch {cur_epoch}: accuracy = {acc:.2f}%")
         if acc > best_accuracy:

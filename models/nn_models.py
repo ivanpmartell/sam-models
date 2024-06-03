@@ -2,6 +2,7 @@ import math
 import torch
 from torch import nn
 import torch.nn.functional as F
+from torch.utils.data import Dataset
 
 class FCNN(nn.Module):
     def __init__(self):
@@ -53,7 +54,7 @@ class RNN(nn.Module):
 
     def forward(self, x):
         rnn, _ = self.bilstm(x)
-        hidden = self.fc1(torch.flatten(rnn, 1))
+        hidden = self.fc1(torch.ravel(rnn, 1))
         out = self.fc2(hidden).squeeze(dim=-1).reshape(x.shape[0], 1024, 9)
         return out
     
@@ -128,3 +129,22 @@ def select_device(print_device = True):
     if print_device:
         print(f"Using {device} device")
     return device
+
+class CustomDataset(Dataset):
+    def __init__(self, x, y, x_transform=None, y_transform=None):
+        self.x = x
+        self.y = y
+        self.x_transform = x_transform
+        self.y_transform = y_transform
+
+    def __getitem__(self, index):
+        x = self.x[index]
+        if self.x_transform:
+            x = self.x_transform(x)
+        y = self.y[index]
+        if self.y_transform:
+            y = self.y_transform(y)
+        return torch.Tensor(x), torch.Tensor(y)
+
+    def __len__(self):
+        return len(self.y)

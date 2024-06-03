@@ -21,16 +21,11 @@ def parse_commandline():
                     help='Pretrained parameters file')
     return parser.parse_args()
 
-def transform_data(X, y):
-    new_X = np.zeros(shape=(len(y)*1024, 1025))
-    new_y = np.zeros(shape=(len(y)*1024,))
-    for i in range(len(y)):
-        max_X = X[i].argmax(1)
-        max_y = y[i].argmax(1)
-        for j in range(1024):
-            new_X[i*1024+j] = np.append(max_X, j)
-            new_y[i*1024+j] = max_y[j]
-    return new_X, new_y
+#Also use nominal_location_preprocess
+def transform_data(X, y, preprocess=frequency_max_location_preprocess):
+    X = preprocess(X)
+    y = single_target_preprocess(y)
+    return X, y
 
 def commands(args, X, y):
     X, y = transform_data(X, y)

@@ -28,62 +28,15 @@ def parse_commandline():
     parser.add_argument('--split_size', type=str,
                         help='Amount of data to split. Values: kfold=1 to 100, train_test=0 to 1',
                         default="0.20")
-    parser.add_argument('--input_preprocess', type=str,
-                        help='Type of preprocessing to be done on input data. Options: nominal, onehot, frequency',
-                        default="frequency")
-    parser.add_argument('--target_preprocess', type=str,
-                        help='Type of preprocessing to be done on target data. Options: nominal, onehot, frequency',
-                        default="onehot")
     return parser.parse_args()
 
-def onehot_encode(X):
-    X_arr = np.array(list(X))
-    enc = preprocessing.OneHotEncoder(categories=[list(get_ss_q8())])
-    X_encoded = enc.fit_transform(X_arr[:, np.newaxis]).toarray()
-    X_padded = np.pad(X_encoded, ((0,1024-len(X_encoded)),(0,0)), 'constant')
-    return X_padded
-
-def onehot_preprocess(X):
-    classes = list(get_ss_q8())
-    concated = np.zeros((1024*len(X),len(classes)))
-    for i, prediction in enumerate(X):
-        concated[i*1024:(i+1)*1024] = onehot_encode(prediction)
-    return concated
-
-def frequency_preprocess(X):
-    classes = list(get_ss_q8())
-    freqs = np.zeros((1024,len(classes)))
-    seqs_len = len(next(iter(X)))
-    for i in range(seqs_len):
-        for prediction in X:
-            freqs[i, ss_index(prediction[i])] += 1
-    max_class_freqs = freqs.max(axis=0)
-    normalized_freqs = np.divide(freqs, max_class_freqs, out=np.zeros_like(freqs), where=max_class_freqs!=0)
-    return normalized_freqs
-
-def nominal_preprocess(X):
-    cats = np.zeros((1024*len(X),))
-    for i, prediction in enumerate(X):
-        for j in range(len(prediction)):
-            cats[1024*i+j] = ss_index(prediction[j])
-    return cats
-
-def nominal_location_preprocess(X):
-    nominal_X = nominal_preprocess(X)
-    new_X = np.zeros(shape=(1024, len(X)*1024+1))
-    for i in range(1024):
-        new_X[i] = np.append(nominal_X, i)
-    return new_X
-
-#input data as mutation centered (requires mutation location knowledge)
-
-def train_test(df, out_paths, split=0.20):
+def train_test(df, out_paths, split):
     X_train, X_test, y_train, y_test = train_test_split(df.x, df.y, test_size=split)
     write_npz(out_paths["train"], X_train, y_train)
     write_npz(out_paths["test"], X_test, y_test)
     write_npz(out_paths["all"], df.x, df.y)
 
-def kfold(df, out_paths, split=3):
+def kfold(df, out_paths, split):
     data_len = len(df.x)
     usable_split = closest_divisor(data_len, split)
     if usable_split != split:
@@ -103,23 +56,9 @@ def data_process(args, df, out_paths):
         print("Uknown splitting method")
         exit(1)
 
-def choose_preprocess(type):
-    if type == "nominal":
-        return nominal_preprocess
-    if type == "nominal_location":
-        return nominal_location_preprocess
-    elif type == "onehot":
-        return onehot_preprocess
-    elif type == "frequency":
-        return frequency_preprocess
-    else:
-        raise ValueError("Unknown preprocessing type given in command arguments")
-
 def main():
     args = parse_commandline()
     predictors = choose_methods(args.methods)
-    input_preprocessor = choose_preprocess(args.input_preprocess)
-    target_preprocessor = choose_preprocess(args.target_preprocess)
-    work_on_data(args, predictors, input_preprocessor, target_preprocessor, data_process)
+    work_on_data(args, predictors, data_process)
 
 main()
