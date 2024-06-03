@@ -19,16 +19,18 @@ def parse_commandline():
                     help='Name to use for this model')
     parser.add_argument('--params', type=str, required=True,
                     help='Pretrained parameters file')
+    parser.add_argument('--preprocess', type=str, default="frequency_max_location",
+                    help='Type of preprocessing for input data. Choices: nominal_location, frequency_location, frequency_max_location')
     return parser.parse_args()
 
-#Also use nominal_location_preprocess
-def transform_data(X, y, preprocess=frequency_max_location_preprocess):
+#Also use nominal_location_preprocess or frequency_max_location_preprocess
+def transform_data(X, y, preprocess):
     X = preprocess(X)
     y = single_target_preprocess(y)
     return X, y
 
 def commands(args, X, y):
-    X, y = transform_data(X, y)
+    X, y = transform_data(X, y, args.preprocess)
     with open(args.params, 'rb') as f:
         cls = pickle.load(f)
     test_acc = cls.score(X, y)
@@ -37,6 +39,7 @@ def commands(args, X, y):
 
 def main():
     args = parse_commandline()
+    args.preprocess = choose_preprocess(args.preprocess)
     work_on_testing(args, commands)
 
 main()
