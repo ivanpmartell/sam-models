@@ -241,7 +241,7 @@ def frequency_location_preprocess(X):
                 freqs[i, j, X[i,1024*k+j]] += 1
     max_class_freqs = np.full((len(X), 1024, 1), 9, dtype=np.int8)
     freqs = np.divide(freqs, max_class_freqs, out=np.zeros_like(freqs), where=max_class_freqs!=0)
-    freqs = freqs.reshape((len(X), 1024*len_classes))
+    freqs = freqs.swapaxes(1,2).reshape((len(X), 1024*len_classes))
     location = np.tile(np.arange(1, 1025, dtype=np.int16), len(X))
     freqs = np.repeat(freqs, repeats=1024, axis=0)
     freqs = np.c_[freqs, location]
