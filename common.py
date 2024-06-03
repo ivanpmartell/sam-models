@@ -72,14 +72,18 @@ def choose_methods(methods):
             raise ValueError("Unknown method or wrong method format in command arguments")
 
 def choose_preprocess(type):
-    if type == "nominal":
-        return nominal_preprocess
+    if type == "single_target":
+        return single_target_preprocess
     if type == "nominal_location":
         return nominal_location_preprocess
     elif type == "onehot":
         return onehot_preprocess
     elif type == "frequency":
         return frequency_preprocess
+    elif type == "frequency_location":
+        return frequency_location_preprocess
+    elif type == "frequency_max_location":
+        return frequency_max_location_preprocess
     else:
         raise ValueError("Unknown preprocessing type given in command arguments")
 
@@ -225,6 +229,22 @@ def frequency_preprocess(X):
                 freqs[i, j, X[i,1024*k+j]] += 1
     max_class_freqs = np.full((len(X), 1024, 1), 9, dtype=np.int8)
     freqs = np.divide(freqs, max_class_freqs, out=np.zeros_like(freqs), where=max_class_freqs!=0)
+    return freqs
+
+def frequency_location_preprocess(X):
+    len_predictors = X.shape[-1]//1024
+    len_classes = len(get_ss_q8())
+    freqs = np.zeros((len(X), 1024, len_classes))
+    for i in range(len(X)):
+        for j in range(1024):
+            for k in range(len_predictors):
+                freqs[i, j, X[i,1024*k+j]] += 1
+    max_class_freqs = np.full((len(X), 1024, 1), 9, dtype=np.int8)
+    freqs = np.divide(freqs, max_class_freqs, out=np.zeros_like(freqs), where=max_class_freqs!=0)
+    freqs = freqs.reshape((len(X), 1024*len_classes))
+    location = np.tile(np.arange(1, 1025, dtype=np.int16), len(X))
+    freqs = np.repeat(freqs, repeats=1024, axis=0)
+    freqs = np.c_[freqs, location]
     return freqs
 
 def frequency_max_location_preprocess(X):
