@@ -4,7 +4,6 @@ import argparse
 from sklearn.ensemble import BaggingClassifier
 from sklearn.tree import ExtraTreeClassifier
 import numpy as np
-import pickle
 
 sys.path.insert(1, os.path.dirname(os.path.dirname(sys.path[0])))
 from common import *
@@ -29,8 +28,7 @@ def commands(args, X, y):
     X, y = transform_data(X, y)
     extra_tree = ExtraTreeClassifier()
     cls = BaggingClassifier(extra_tree).fit(X, y)
-    with open(args.out_file, 'wb') as f:
-        pickle.dump(cls, f)
+    write_classifier(args.out_file, cls)
 
 def main():
     args = parse_commandline()

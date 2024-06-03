@@ -7,6 +7,7 @@ from sklearn import preprocessing
 import pandas as pd
 import numpy as np
 from operator import add, sub
+import pickle
 
 def get_ss_q8():
     return "_BCEGHIST"
@@ -184,6 +185,11 @@ def write_fasta(path, sequences):
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a") as output_handle:
         SeqIO.write(out_sequences, output_handle, "fasta")
+
+def write_classifier(path, cls):
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    with open(path, 'wb') as f:
+        pickle.dump(cls, f)
 
 def write_npz(path, x, y):
     Path(path).parent.mkdir(parents=True, exist_ok=True)
