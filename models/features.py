@@ -18,6 +18,9 @@ def parse_commandline():
                     help='Feature selection testing methodology to be used. Options: chi2, anova, mutual_info')
     parser.add_argument('--params', type=str,
                     help='Parameters of classifier with feature importance scores')
+    parser.add_argument('--methods', type=str,
+                        help='Keyword or Comma separated list of methods to include in prediction. Keywords: all, top, avg, low',
+                        default="all")
     return parser.parse_args()
 
 def choose_test(test):
@@ -46,8 +49,7 @@ def test_importance(in_path, test_type):
     fs.fit_transform(X, y)
     return [fs.scores_]
 
-def process(out_path, scores):
-    predictors = get_all_predictors()
+def process(out_path, predictors, scores):
     predictor_score = {}
     for predictor in predictors:
         predictor_score[predictor] = 0
@@ -78,6 +80,7 @@ def main():
     abs_input = os.path.abspath(args.input)
     abs_output_dir = missing_output_is_input(args, os.path.dirname(abs_input))
     out_file = os.path.join(abs_output_dir, f"{args.test}_feature_importance.res")
-    process(out_file, scores)
+    predictors = choose_methods(args.methods)
+    process(out_file, predictors, scores)
 
 main()
