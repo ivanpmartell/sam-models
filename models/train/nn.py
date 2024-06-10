@@ -19,6 +19,8 @@ def parse_commandline():
                     help='Base directory where trained parameters will be saved. Leave empty to use input directory')
     parser.add_argument('--model', type=str, required=True,
                     help='Type of neural network model to use')
+    parser.add_argument('--predictors', type=int, required=True,
+                    help='Amount of predictors in input data')
     return parser.parse_args()
 
 def train(dataloader, model, loss_fn, optimizer, device):
@@ -45,11 +47,11 @@ def evaluate(model, X_test, y_test):
     return acc
 
 def commands(args, X, y):
-    ds = CustomDataset(X, y, x_transform=frequency_preprocess, y_transform=onehot_preprocess)
+    ds = CustomDataset(X, y, x_transform=onehot_preprocess, y_transform=onehot_preprocess)
     train_set, test_set = random_split(ds, [0.9, 0.1])
-    train_dataloader = DataLoader(train_set, shuffle=True, batch_size=16)
+    train_dataloader = DataLoader(train_set, shuffle=True, batch_size=8)
     X_test, y_test = default_collate(test_set)
-    model = args.NNModel().to(args.device)
+    model = args.NNModel(args.predictors).to(args.device)
     loss_fn = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
     scheduler = lr_scheduler.LinearLR(optimizer, start_factor=1.0, end_factor=0.1, total_iters=50)

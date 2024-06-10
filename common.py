@@ -206,17 +206,18 @@ def load_npz(path):
     return X, y
 
 def onehot_encode(X):
-    X_arr = np.array(list(X))
-    enc = preprocessing.OneHotEncoder(categories=[list(get_ss_q8())])
-    X_encoded = enc.fit_transform(X_arr[:, np.newaxis]).toarray()
-    X_padded = np.pad(X_encoded, ((0,1024-len(X_encoded)),(0,0)), 'constant')
-    return X_padded
+    classes = len(get_ss_q8())
+    return np.eye(classes)[X]
 
 def onehot_preprocess(X):
+    len_predictors = X.shape[-1]//1024
     classes = list(get_ss_q8())
-    concated = np.zeros((1024*len(X),len(classes)))
-    for i, prediction in enumerate(X):
-        concated[i*1024:(i+1)*1024] = onehot_encode(prediction)
+    if len(X.shape) > 1:
+        concated = np.zeros((len(X), 1024* len_predictors, len(classes)))
+        for i, prediction in enumerate(X):
+            concated[i] = onehot_encode(prediction)
+    else:
+        concated = onehot_encode(X)
     return concated
 
 def frequency_preprocess(X):

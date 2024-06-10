@@ -5,70 +5,76 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset
 
 class FCNN(nn.Module):
-    def __init__(self):
-      super(FCNN, self).__init__()
-      self.hidden = nn.Sequential(nn.Linear(1024*9, 2048*2),
-                                 nn.ReLU(),
-                                 nn.Linear(2048*2, 2048),
-                                 nn.ReLU(),
-                                 nn.Dropout(0.5))
-      self.out = nn.Linear(2048, 1024*9)
+    def __init__(self, num_predictors, classes=9, seq_len=1024):
+        super(FCNN, self).__init__()
+        self.classes = classes
+        self.seq_len = seq_len
+        self.hidden = nn.Sequential(nn.Linear(seq_len*num_predictors*classes, seq_len*classes),
+                                    nn.ReLU(),
+                                    nn.Linear(seq_len*classes, seq_len),
+                                    nn.ReLU(),
+                                    nn.Dropout(0.1))
+        self.out = nn.Linear(seq_len, seq_len*classes)
 
     def forward(self, x):
-      x = x.reshape(x.shape[0], -1)
-      hidden = self.hidden(x)
-      out = self.out(hidden).reshape(x.shape[0], 1024, 9)
-      return out
+        x = x.reshape(x.shape[0], -1)
+        hidden = self.hidden(x)
+        out = self.out(hidden).reshape(x.shape[0], self.seq_len, self.classes)
+        return out
     
 class CNN(nn.Module):
-    def __init__(self):
-      super(CNN, self).__init__()
-      self.conv = nn.Sequential(nn.Conv1d(in_channels=9,
-                                           out_channels=9, kernel_size=21),
-                                 nn.ReLU(),
-                                 nn.MaxPool1d(4),
-                                 nn.Dropout(0.5))
-      self.hidden = nn.Sequential(nn.Linear(9*251, 2048),
-                                 nn.ReLU(),
-                                 nn.Dropout(0.5))
-      self.out = nn.Linear(2048, 1024*9)
+    def __init__(self, num_predictors, classes=9, seq_len=1024):
+        super(CNN, self).__init__()
+        self.classes = classes
+        self.seq_len = seq_len
+        self.conv = nn.Sequential(nn.Conv1d(in_channels=classes,
+                                            out_channels=classes, kernel_size=21),
+                                    nn.ReLU(),
+                                    nn.MaxPool1d(4),
+                                    nn.Dropout(0.5))
+        self.hidden = nn.Sequential(nn.Linear(classes*251, seq_len),
+                                    nn.ReLU(),
+                                    nn.Dropout(0.5))
+        self.out = nn.Linear(seq_len, seq_len*classes)
 
     def forward(self, x):
-      x = x.permute(0, 2, 1)
-      features = self.conv(x).squeeze(dim=-1)
-      features = features.reshape(features.shape[0], -1)
-      hidden = self.hidden(features)
-      out = self.out(hidden).reshape(x.shape[0], 1024, 9)
-      return out
+        x = x.permute(0, 2, 1)
+        features = self.conv(x).squeeze(dim=-1)
+        features = features.reshape(features.shape[0], -1)
+        hidden = self.hidden(features)
+        out = self.out(hidden).reshape(x.shape[0], self.seq_len, self.classes)
+        return out
     
 class RNN(nn.Module):
-    def __init__(self):
+    def __init__(self, num_predictors, classes=9, seq_len=1024):
         super(RNN, self).__init__()
+        self.classes = classes
+        self.seq_len = seq_len
         self.bilstm = nn.LSTM(
-            9, 32, 2, bias=True,
+            classes, 32, 2, bias=True,
             batch_first=True, dropout=0.5, bidirectional=True)
-        self.fc1 = nn.Sequential(nn.Linear(64*1024, 2048),
+        self.fc1 = nn.Sequential(nn.Linear(32*2*seq_len, seq_len),
                                  nn.ReLU(),
                                  nn.Dropout(0.5))
-        self.fc2 = nn.Linear(2048, 1024*9)
+        self.fc2 = nn.Linear(seq_len, seq_len*classes)
 
     def forward(self, x):
         rnn, _ = self.bilstm(x)
         hidden = self.fc1(torch.ravel(rnn, 1))
-        out = self.fc2(hidden).squeeze(dim=-1).reshape(x.shape[0], 1024, 9)
+        out = self.fc2(hidden).squeeze(dim=-1).reshape(x.shape[0], self.seq_len, self.classes)
         return out
     
 class TNN(nn.Module):
-    def __init__(self, ntoken = 9, d_model = 32, nhead = 2, d_hid = 128,
-                 nlayers = 2, dropout: float = 0.5):
+    def __init__(self, num_predictors, classes=9, seq_len=1024, d_model = 32, nhead = 2, d_hid = 128,
+                 nlayers = 2, dropout = 0.5):
         super(TNN, self).__init__()
         self.device = select_device(False)
-        self.pos_encoder = PosEncoding(d_model, dropout)
+        self.pos_encoder = PosEncoding(d_model, dropout, seq_len)
         encoder_layers = nn.TransformerEncoderLayer(d_model, nhead, d_hid, dropout, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layers, nlayers)
-        self.embedding = nn.Embedding(ntoken, d_model)
+        self.embedding = nn.Embedding(classes, d_model)
         self.d_model = d_model
-        self.linear = nn.Linear(d_model, ntoken)
+        self.linear = nn.Linear(d_model, classes)
         self.init_weights()
 
     def init_weights(self) -> None:
@@ -91,7 +97,7 @@ class TNN(nn.Module):
         return out
 
 class PosEncoding(nn.Module):
-    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 1024):
+    def __init__(self, d_model: int, dropout: float, max_len: int):
         super(PosEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
         position = torch.arange(max_len).unsqueeze(1)
