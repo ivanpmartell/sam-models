@@ -32,7 +32,7 @@ class CNN(nn.Module):
                                     nn.ReLU(),
                                     nn.MaxPool1d(4),
                                     nn.Dropout(0.5))
-        self.hidden = nn.Sequential(nn.Linear(classes*251, seq_len),
+        self.hidden = nn.Sequential(nn.Linear(classes*2299, seq_len),
                                     nn.ReLU(),
                                     nn.Dropout(0.5))
         self.out = nn.Linear(seq_len, seq_len*classes)

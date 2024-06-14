@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 from operator import add, sub
 import pickle
+from numpy.lib.stride_tricks import as_strided
 
 def get_ss_q8():
     return "_BCEGHIST"
@@ -209,72 +210,102 @@ def onehot_encode(X):
     classes = len(get_ss_q8())
     return np.eye(classes)[X]
 
-def onehot_preprocess(X):
-    len_predictors = X.shape[-1]//1024
+def onehot_preprocess(X, max_len=1024):
+    len_predictors = X.shape[-1]//max_len
     classes = list(get_ss_q8())
     if len(X.shape) > 1:
-        concated = np.zeros((len(X), 1024* len_predictors, len(classes)))
+        concated = np.zeros((len(X), max_len* len_predictors, len(classes)))
         for i, prediction in enumerate(X):
             concated[i] = onehot_encode(prediction)
     else:
         concated = onehot_encode(X)
     return concated
 
-def frequency_preprocess(X):
-    len_predictors = X.shape[-1]//1024
+def frequency_preprocess(X, max_len=1024):
+    len_predictors = X.shape[-1]//max_len
     len_classes = len(get_ss_q8())
-    freqs = np.zeros((len(X), 1024, len_classes))
+    freqs = np.zeros((len(X), max_len, len_classes))
     for i in range(len(X)):
-        for j in range(1024):
+        for j in range(max_len):
             for k in range(len_predictors):
-                freqs[i, j, X[i,1024*k+j]] += 1
-    max_class_freqs = np.full((len(X), 1024, 1), 9, dtype=np.int8)
+                freqs[i, j, X[i,max_len*k+j]] += 1
+    max_class_freqs = np.full((len(X), max_len, 1), 9, dtype=np.int8)
     freqs = np.divide(freqs, max_class_freqs, out=np.zeros_like(freqs), where=max_class_freqs!=0)
     return freqs
 
-def frequency_location_preprocess(X):
-    len_predictors = X.shape[-1]//1024
+def frequency_location_preprocess(X, max_len=1024, circular=False):
+    len_predictors = X.shape[-1]//max_len
     len_classes = len(get_ss_q8())
-    freqs = np.zeros((len(X), 1024, len_classes))
+    freqs = np.zeros((len(X), max_len, len_classes))
     for i in range(len(X)):
-        for j in range(1024):
+        for j in range(max_len):
             for k in range(len_predictors):
-                freqs[i, j, X[i,1024*k+j]] += 1
-    max_class_freqs = np.full((len(X), 1024, 1), 9, dtype=np.int8)
+                freqs[i, j, X[i,max_len*k+j]] += 1
+    max_class_freqs = np.full((len(X), max_len, 1), 9, dtype=np.int8)
     freqs = np.divide(freqs, max_class_freqs, out=np.zeros_like(freqs), where=max_class_freqs!=0)
-    freqs = freqs.swapaxes(1,2).reshape((len(X), 1024*len_classes))
-    location = np.tile(np.arange(1, 1025, dtype=np.int16), len(X))
-    freqs = np.repeat(freqs, repeats=1024, axis=0)
-    freqs = np.c_[freqs, location]
+    freqs = freqs.swapaxes(1,2).reshape((len(X), max_len*len_classes))
+    freqs = np.repeat(freqs, repeats=max_len, axis=0)
+    if circular:
+        for i in range(len_classes):
+            freqs[:, i*max_len:i*max_len+max_len] = custom_roll(freqs[:, i*max_len:i*max_len+max_len], max_len)
+    else:
+        location = np.tile(np.arange(1, max_len+1, dtype=np.int16), len(X))
+        freqs = np.c_[freqs, location]
     return freqs
 
-def frequency_max_location_preprocess(X):
-    len_predictors = X.shape[-1]//1024
+def frequency_circular_location_preprocess(X, max_len=1024):
+    return frequency_location_preprocess(X, max_len, True)
+
+def frequency_max_location_preprocess(X, max_len=1024, circular=False):
+    len_predictors = X.shape[-1]//max_len
     len_classes = len(get_ss_q8())
-    freqs = np.zeros((len(X), 1024, len_classes))
+    freqs = np.zeros((len(X), max_len, len_classes))
     for i in range(len(X)):
-        for j in range(1024):
+        for j in range(max_len):
             for k in range(len_predictors):
-                freqs[i, j, X[i,1024*k+j]] += 1
+                freqs[i, j, X[i,max_len*k+j]] += 1
     freqs = np.argmax(freqs,axis=2)
-    location = np.tile(np.arange(1, 1025, dtype=np.int16), len(X))
-    freqs = np.repeat(freqs, repeats=1024, axis=0)
-    freqs = np.c_[freqs, location]
+    freqs = np.repeat(freqs, repeats=max_len, axis=0)
+    if circular:
+        freqs = custom_roll(freqs, max_len)
+    else:
+        location = np.tile(np.arange(1, max_len+1, dtype=np.int16), len(X))
+        freqs = np.c_[freqs, location]
     return freqs
 
-def nominal_preprocess(X, numtype=float):
-    cats = np.zeros((1024*len(X),), dtype=numtype)
+def frequency_circular_max_location_preprocess(X, max_len=1024):
+    return frequency_max_location_preprocess(X, max_len, True)
+
+def nominal_preprocess(X, max_len=1024, numtype=float):
+    cats = np.zeros((max_len*len(X),), dtype=numtype)
     for i, prediction in enumerate(X):
         for j in range(len(prediction)):
-            cats[1024*i+j] = ss_index(prediction[j])
+            cats[max_len*i+j] = ss_index(prediction[j])
     return cats
 
-def nominal_location_preprocess(X):
-    X_len, _ = X.shape
-    location = np.tile(np.arange(1, 1025, dtype=np.int16), X_len)
-    X = np.repeat(X, repeats=1024, axis=0)
-    X = np.c_[X, location]
+def nominal_location_preprocess(X, max_len=1024, circular=False):
+    X_len = X.shape[0]
+    len_predictors = X.shape[-1]//max_len
+    X = np.repeat(X, repeats=max_len, axis=0)
+    if circular:
+        for i in range(len_predictors):
+            X[:, i*max_len:i*max_len+max_len] = custom_roll(X[:, i*max_len:i*max_len+max_len], max_len)
+    else:
+        location = np.tile(np.arange(1, max_len+1, dtype=np.int16), X_len)
+        X = np.c_[X, location]
     return X
+
+def nominal_circular_location_preprocess(X, max_len=1024):
+    return nominal_location_preprocess(X, max_len, True)
+
+def custom_roll(arr, max_len=1024):
+    m = np.arange(max_len)*-1
+    m = np.tile(m, len(arr)//1024)
+    arr_roll = arr[:, [*range(arr.shape[1]),*range(arr.shape[1]-1)]].copy()
+    strd_0, strd_1 = arr_roll.strides
+    n = arr.shape[1]
+    result = as_strided(arr_roll, (*arr.shape, n), (strd_0 ,strd_1, strd_1))
+    return result[np.arange(arr.shape[0]), (n-m)%n]
 
 def single_target_preprocess(y):
     return y.ravel().astype(float)
