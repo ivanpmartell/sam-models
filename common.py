@@ -1,5 +1,8 @@
 import os
+import re
+import math
 from pathlib import Path
+from typing import NamedTuple
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
@@ -85,6 +88,8 @@ def choose_preprocess(type):
         return frequency_location_preprocess
     elif type == "frequency_max_location":
         return frequency_max_location_preprocess
+    elif type == "nominal_windowed":
+        return nominal_windowed_preprocess
     else:
         raise ValueError("Unknown preprocessing type given in command arguments")
 
@@ -116,7 +121,17 @@ def work_on_predicting(args, cmds, predictors):
                 prediction_path = os.path.join(cluster_dir, predictor, f"{protein}{args.pred_ext}")
                 predictions[predictor] = get_single_record_fasta(prediction_path)
             #assignment = get_single_record_fasta(f)
-            output = cmds(args, predictions)
+            if args.mutation_file:
+                mut_path = os.path.join(cluster_dir, args.mutation_file)
+                all_mutations = read_mutations(mut_path)
+                prot_muts = mutations_in_protein(all_mutations, protein)
+                if len(prot_muts) == 0:
+                    mut_position = all_mutations[0].position_
+                else:
+                    mut_position = prot_muts[0].position_
+            else:
+                mut_position = None
+            output = cmds(args, predictions, mut_position)
             write_fasta(out_file, output)
 
 def work_on_data(args, predictors, data_process):
@@ -134,7 +149,6 @@ def work_on_data(args, predictors, data_process):
     if not condition:
         training_data = []
         for f in Path(abs_input_dir).rglob(f"*{args.assign_ext}"):
-            #TODO:Get mutation locations from file
             cluster_dir = os.path.dirname(f)
             f_basename = os.path.basename(f)
             protein = f_basename[0:f_basename.index('.')]
@@ -143,8 +157,17 @@ def work_on_data(args, predictors, data_process):
                 prediction_path = os.path.join(cluster_dir, predictor, f"{protein}{args.pred_ext}")
                 predictions[predictor] = get_single_record_fasta(prediction_path)
             assignment = get_single_record_fasta(f)
-            x = nominal_preprocess(predictions.values(), np.uint8)
-            y = nominal_preprocess([assignment.seq], np.uint8)
+            if args.mutation_file:
+                mut_path = os.path.join(cluster_dir, args.mutation_file)
+                mutations = mutations_in_protein(read_mutations(mut_path), protein)
+                if len(mutations) != 1:
+                    continue
+                mut_position = mutations[0].position_
+                x = mutation_nominal_data(predictions.values(), mut_position, np.uint8)
+                y = nominal_data([assignment.seq], np.uint8)
+            else:
+                x = nominal_data(predictions.values(), np.uint8)
+                y = nominal_data([assignment.seq], np.uint8)
             data = {"x": x, "y": y}
             training_data.append(data)
         df = pd.DataFrame.from_dict(training_data)
@@ -176,11 +199,43 @@ def work_on_testing(args, cmds):
     print("Testing Done!")
 
 ### Data functions below
+class Mutation(NamedTuple):
+    from_: str
+    position_: int
+    to_: str
+    proteins_: list
+
+def read_mutations(f):
+    mutations = []
+    with open(f, 'r') as file:
+        for mutation in file:
+            pos_regex = r"(\w)(\d+)(\w) \[(.*)\]"
+            from_str, pos_str, to_str, proteins = re.match(pos_regex, mutation, flags=re.IGNORECASE).groups()
+            proteins_list = proteins.replace('[', '').replace(']', '').replace('"', '')
+            proteins_list = proteins_list.split(',')
+            position = int(pos_str)
+            mut = Mutation(from_str, position, to_str, proteins_list)
+            mutations.append(mut)
+    return mutations
+
+def mutations_in_protein(mutations, protein):
+    muts = []
+    for mut in mutations:
+        if protein in mut.proteins_:
+            muts.append(mut)
+    return muts
+
 def read_fasta(f):
     return list(SeqIO.parse(f, "fasta"))
 
 def get_single_record_fasta(f):
     return read_fasta(f)[0]
+
+def read_score(f):
+    with open(f, 'r') as file:
+        return float(file.readline())
+
+
 
 #sequences input are a dictionary of id -> sequence (str)
 def write_fasta(path, sequences):
@@ -210,18 +265,18 @@ def onehot_encode(X):
     classes = len(get_ss_q8())
     return np.eye(classes)[X]
 
-def onehot_preprocess(X, max_len=1024):
-    len_predictors = X.shape[-1]//max_len
+def onehot_preprocess(Xy, max_len=1024, windowed=False):
+    len_predictors = Xy.shape[-1]//max_len
     classes = list(get_ss_q8())
-    if len(X.shape) > 1:
-        concated = np.zeros((len(X), max_len* len_predictors, len(classes)))
-        for i, prediction in enumerate(X):
+    if len(Xy.shape) > 1:
+        concated = np.zeros((len(Xy), max_len* len_predictors, len(classes)))
+        for i, prediction in enumerate(Xy):
             concated[i] = onehot_encode(prediction)
     else:
-        concated = onehot_encode(X)
+        concated = onehot_encode(Xy)
     return concated
 
-def frequency_preprocess(X, max_len=1024):
+def frequency_preprocess(X, max_len=1024, windowed=False):
     len_predictors = X.shape[-1]//max_len
     len_classes = len(get_ss_q8())
     freqs = np.zeros((len(X), max_len, len_classes))
@@ -256,6 +311,17 @@ def frequency_location_preprocess(X, max_len=1024, circular=False):
 def frequency_circular_location_preprocess(X, max_len=1024):
     return frequency_location_preprocess(X, max_len, True)
 
+def frequency_max_preprocess(X, max_len=1024, windowed=False):
+    len_predictors = X.shape[-1]//max_len
+    len_classes = len(get_ss_q8())
+    freqs = np.zeros((len(X), max_len, len_classes))
+    for i in range(len(X)):
+        for j in range(max_len):
+            for k in range(len_predictors):
+                freqs[i, j, X[i,max_len*k+j]] += 1
+    freqs = np.argmax(freqs,axis=2)
+    return freqs
+
 def frequency_max_location_preprocess(X, max_len=1024, circular=False):
     len_predictors = X.shape[-1]//max_len
     len_classes = len(get_ss_q8())
@@ -276,13 +342,6 @@ def frequency_max_location_preprocess(X, max_len=1024, circular=False):
 def frequency_circular_max_location_preprocess(X, max_len=1024):
     return frequency_max_location_preprocess(X, max_len, True)
 
-def nominal_preprocess(X, max_len=1024, numtype=float):
-    cats = np.zeros((max_len*len(X),), dtype=numtype)
-    for i, prediction in enumerate(X):
-        for j in range(len(prediction)):
-            cats[max_len*i+j] = ss_index(prediction[j])
-    return cats
-
 def nominal_location_preprocess(X, max_len=1024, circular=False):
     X_len = X.shape[0]
     len_predictors = X.shape[-1]//max_len
@@ -300,7 +359,7 @@ def nominal_circular_location_preprocess(X, max_len=1024):
 
 def custom_roll(arr, max_len=1024):
     m = np.arange(max_len)*-1
-    m = np.tile(m, len(arr)//1024)
+    m = np.tile(m, len(arr)//max_len)
     arr_roll = arr[:, [*range(arr.shape[1]),*range(arr.shape[1]-1)]].copy()
     strd_0, strd_1 = arr_roll.strides
     n = arr.shape[1]
@@ -310,4 +369,37 @@ def custom_roll(arr, max_len=1024):
 def single_target_preprocess(y):
     return y.ravel().astype(float)
 
-#input data as mutation centered (requires mutation location knowledge)
+def nominal_data(X, numtype=float, max_len=1024):
+    cats = np.zeros((max_len*len(X),), dtype=numtype)
+    for i, prediction in enumerate(X):
+        for j in range(len(prediction)):
+            cats[max_len*i+j] = ss_index(prediction[j])
+    return cats
+
+def mutation_nominal_data(X, mut_position, numtype=float, max_len=2048):
+    cats = np.zeros((max_len*len(X),), dtype=numtype)
+    for i, prediction in enumerate(X):
+        for j in range(len(prediction)):
+            cats[max_len*i+j] = ss_index(prediction[j])
+        cats[i*max_len:i*max_len+max_len] = np.roll(cats[i*max_len:i*max_len+max_len], (max_len//2)-mut_position+1) #midway point is the centered mutation location (e.g. 1024 for 2048 max len)
+    return cats
+
+# Window side length is used for each side of the current amino acid
+def nominal_windowed_preprocess(Xy, max_len, max_window_side_len=20):
+    Xy_len = Xy.shape[0]
+    len_predictors = Xy.shape[-1]//max_len
+    window_len = max_window_side_len * 2 + 1
+    Xy = Xy.reshape((Xy_len, len_predictors, max_len))
+    Xy = np.pad(Xy, ((0, 0), (0, 0), (max_window_side_len, max_window_side_len)))
+    res = np.zeros((Xy_len * max_len, window_len * len_predictors))
+    for i in range(max_len):
+        res[i::max_len] = Xy[:,:,i:window_len+i].reshape((Xy_len, -1))
+    return res
+
+def frequency_windowed_preprocess(Xy, max_window_side_len=20, max_len=1024):
+    window_len = max_window_side_len * 2 + 1
+    return Xy.reshape(math.ceil(max_len/window_len), window_len)
+
+def onehot_windowed_preprocess(Xy, max_window_side_len=20, max_len=1024):
+    window_len = max_window_side_len * 2 + 1
+    return Xy.reshape(math.ceil(max_len/window_len), window_len)

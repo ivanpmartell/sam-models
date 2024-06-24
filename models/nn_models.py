@@ -112,16 +112,16 @@ class PosEncoding(nn.Module):
 
 def select_model(model):
     model = model.lower()
-    if model == "fullyconnected":
+    if "fullyconnected" in model:
         return FCNN
-    elif model == "convolutional":
+    elif "convolutional" in model:
         return CNN
-    elif model == "recurrent":
+    elif "recurrent" in model:
         return RNN
-    elif model == "transformer":
+    elif "transformer" in model:
         return TNN
     else:
-        print("Incorrect model, please choose: FullyConnected, Convolutional, Recurrent, Transformer")
+        print("Incorrect model, please choose from: FullyConnected, Convolutional, Recurrent, Transformer")
         exit(1)
 
 def select_device(print_device = True):

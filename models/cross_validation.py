@@ -20,19 +20,21 @@ def parse_commandline():
     parser.add_argument('--split_size', type=str,
                         help='Amount of data to split. Values:1 to 100',
                         default="5")
+    parser.add_argument('--preprocess', type=str, default="frequency_max_location",
+                    help='Type of preprocessing for input data. Choices: nominal_location, frequency_location, frequency_max_location')
     return parser.parse_args()
 
 def select_model(model):
     model = model.lower()
-    if model == "forest":
+    if "forest" in model:
         return "{0}/forest.py"
-    elif model == "fullyconnected":
+    elif "fullyconnected" in model:
         return "{0}/nn.py"
-    elif model == "convolutional":
+    elif "convolutional" in model:
         return "{0}/nn.py"
-    elif model == "recurrent":
+    elif "recurrent" in model:
         return "{0}/nn.py"
-    elif model == "transformer":
+    elif "transformer" in model:
         return "{0}/nn.py"
     else:
         print("Incorrect model, please choose: Forest, FullyConnected, Convolutional, Recurrent, Transformer")
@@ -45,6 +47,7 @@ def pipeline(args):
     data_dir = os.path.join(abs_out_dir, "data")
     subprocess.check_call(['python', os.path.join(current_path, 'data.py'), args.input, '--out_dir', data_dir, '--split_type', 'kfold', '--split_size', args.split_size, '--methods', args.methods])
     # loop for train and test (leave one out) for each fold
+    fold_accs = []
     fold_list = list(range(int(args.split_size)))
     for i in fold_list:
         fold_dir = os.path.join(abs_out_dir, f"fold{i}")
@@ -65,15 +68,16 @@ def pipeline(args):
             write_npz(test_data_path, X_test, y_test)
         # Training
         script_path = os.path.join(current_path, select_model(args.model))
-        subprocess.call(['python', script_path.format("train"), train_data_path, '--out_dir', fold_dir, "--model", args.model])
+        subprocess.call(['python', script_path.format("train"), train_data_path, '--out_dir', fold_dir, "--model", args.model, "--preprocess", args.preprocess])
         # Testing
         params_path = os.path.join(fold_dir, f"{args.model}_trained.params")
-        subprocess.call(['python', script_path.format("test"), test_data_path, '--params', params_path, "--model", args.model])
+        subprocess.call(['python', script_path.format("test"), test_data_path, '--params', params_path, "--model", args.model, "--preprocess", args.preprocess])
         os.rename(params_path, os.path.join(fold_dir, f"{args.model}_{args.methods}.params"))
         scores_path = os.path.join(fold_dir, f"{args.model}_score.res")
+        fold_accs.append(read_score(scores_path))
         os.rename(scores_path, os.path.join(fold_dir, f"{args.model}_{args.methods}.score"))
     #print and save file with agglomerated results of complete cross-validation
-
+    print(f"Cross validation mean accuracy: {sum(fold_accs)/len(fold_accs)}")
 
 
 def main():

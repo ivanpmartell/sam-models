@@ -20,6 +20,8 @@ def parse_commandline():
     parser.add_argument('--methods', type=str,
                         help='Keyword or Comma separated list of methods to include in majority consensus prediction. Keywords: all, top, avg, low',
                         default="all")
+    parser.add_argument('--model', type=str, default="majority",
+                    help='Name to use for this model')
     return parser.parse_args()
 
 def commands(args, predictions):
@@ -40,7 +42,6 @@ def commands(args, predictions):
 def main():
     args = parse_commandline()
     predictors = choose_methods(args.methods)
-    args.model = "majority"
     work_on_predicting(args, commands, predictors)
 
 main()

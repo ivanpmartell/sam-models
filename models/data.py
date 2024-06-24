@@ -20,8 +20,7 @@ def parse_commandline():
                         help='Extension of ss assigned files',
                         default=".ssfa")
     parser.add_argument('--mutation_file', type=str,
-                        help='Filename of mutation files',
-                        default="mutations.txt")
+                        help='Filename of mutation files. Usually "mutations.txt". Leave empty to not use mutation data')
     parser.add_argument('--methods', type=str,
                         help='Keyword or Comma separated list of methods to include in prediction. Keywords: all, top, avg, low',
                         default="all")
