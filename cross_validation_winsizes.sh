@@ -7,4 +7,6 @@ plist=(0 1 2 3 5 7 11 13 17 19 23 29 31 37 41 43 47 53 59 61 67 71 73 79 83 89 9
 for i in ${plist[@]}; do
     echo "Working on window size $i"
     python models/cross_validation.py $input_clusters_folder --out_dir $output_processing_folder --model forest_win_$i --methods top --split_size $split --preprocess nominal_windowed --win_side_len $i
+    python models/cross_validation.py $input_clusters_folder --out_dir $output_processing_folder --model forest_win_$i --methods avg --split_size $split --preprocess nominal_windowed --win_side_len $i
+    python models/cross_validation.py $input_clusters_folder --out_dir $output_processing_folder --model forest_win_$i --methods low --split_size $split --preprocess nominal_windowed --win_side_len $i
 done
