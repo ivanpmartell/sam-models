@@ -1,5 +1,5 @@
 #!/bin/bash
-for ((i = 1; i <= N; i++)); do=$2
+output_processing_folder=$2
 input_clusters_folder=$1
 split=$3
 
