@@ -22,6 +22,8 @@ def parse_commandline():
                         default="5")
     parser.add_argument('--preprocess', type=str, default="frequency_max_location",
                     help='Type of preprocessing for input data. Choices: nominal_location, frequency_location, frequency_max_location')
+    parser.add_argument('--win_side_len', type=int, default=1024,
+                    help='Window size for windowed preprocessing of inputs.')
     return parser.parse_args()
 
 def select_model(model):
@@ -68,10 +70,10 @@ def pipeline(args):
             write_npz(test_data_path, X_test, y_test)
         # Training
         script_path = os.path.join(current_path, select_model(args.model))
-        subprocess.call(['python', script_path.format("train"), train_data_path, '--out_dir', fold_dir, "--model", args.model, "--preprocess", args.preprocess])
+        subprocess.call(['python', script_path.format("train"), train_data_path, '--out_dir', fold_dir, "--model", args.model, "--preprocess", args.preprocess, "--win_side_len", str(args.win_side_len)])
         # Testing
         params_path = os.path.join(fold_dir, f"{args.model}_trained.params")
-        subprocess.call(['python', script_path.format("test"), test_data_path, '--params', params_path, "--model", args.model, "--preprocess", args.preprocess])
+        subprocess.call(['python', script_path.format("test"), test_data_path, '--params', params_path, "--model", args.model, "--preprocess", args.preprocess, "--win_side_len", str(args.win_side_len)])
         os.rename(params_path, os.path.join(fold_dir, f"{args.model}_{args.methods}.params"))
         scores_path = os.path.join(fold_dir, f"{args.model}_score.res")
         fold_accs.append(read_score(scores_path))

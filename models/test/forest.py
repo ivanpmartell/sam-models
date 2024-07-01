@@ -23,16 +23,21 @@ def parse_commandline():
                     help='Type of preprocessing for input data. Choices: nominal_location, frequency_location, frequency_max_location')
     parser.add_argument('--seq_len', type=int, default=1024,
                     help='Maximum sequence length of inputs.')
+    parser.add_argument('--win_side_len', type=int,
+                    help='Size of window for input.')
     return parser.parse_args()
 
 #Also use nominal_location_preprocess or frequency_max_location_preprocess
-def transform_data(X, y, preprocess, max_len):
-    X = preprocess(X, max_len)
+def transform_data(X, y, preprocess, max_len, win_side_len):
+    if win_side_len is not None:
+        X = preprocess(X, max_len, win_side_len)
+    else:
+        X = preprocess(X, max_len)
     y = single_target_preprocess(y)
     return X, y
 
 def commands(args, X, y):
-    X, y = transform_data(X, y, args.preprocess, args.seq_len)
+    X, y = transform_data(X, y, args.preprocess, args.seq_len, args.win_side_len)
     with open(args.params, 'rb') as f:
         cls = pickle.load(f)
     test_acc = cls.score(X, y)
