@@ -3,7 +3,7 @@ output_processing_folder=$2
 input_clusters_folder=$1
 split=$3
 
-plist=(0 1 2 3 5 7 11 13 17 19 23 29 31 37 41 43 47 53 59 61 67 71 73 79 83 89 97)
+plist=(0 1 2 3 5 7 11 13 17 19 23 29 31 37 41 43 47 53 59 61 67 71 73 79 83 89 97 101 151 211 251 307 353 401 449 503)
 for i in ${plist[@]}; do
     echo "Working on window size $i"
     mlist=("top" "avg" "low")
