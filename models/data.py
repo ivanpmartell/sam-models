@@ -6,6 +6,7 @@ from sklearn.model_selection import train_test_split
 
 sys.path.insert(1, os.path.dirname(sys.path[0]))
 from common import *
+from data_preprocess import *
 
 def parse_commandline():
     parser = argparse.ArgumentParser(description='Script to preprocess data for machine learning use')
@@ -40,7 +41,7 @@ def train_test(df, out_paths, split):
 
 def kfold(df, out_paths, split):
     data_len = len(df.x)
-    usable_split = closest_divisor(data_len, split)
+    usable_split = closest_split(data_len, split)
     if usable_split != split:
         exit(2)
     Xs  = np.split(df.x, usable_split)
@@ -61,6 +62,44 @@ def data_process(args, df, out_paths):
 def main():
     args = parse_commandline()
     predictors = choose_methods(args.methods)
-    work_on_data(args, predictors, data_process)
+    abs_input_dir = os.path.abspath(args.dir)
+    abs_output_dir = missing_output_is_input(args, abs_input_dir)
+    if args.split_type == "kfold":
+        fname_prefix = f"{args.methods}_kfold"
+        out_files = {"kfold": os.path.join(abs_output_dir, fname_prefix + "{0}.npz")}
+        condition = any(fname.startswith(fname_prefix) for fname in os.listdir(abs_output_dir)) if os.path.exists(abs_output_dir) else False
+    elif args.split_type == "train_test":
+        out_files = {"train": os.path.join(abs_output_dir, f"{args.methods}_train.npz"),
+                    "test": os.path.join(abs_output_dir, f"{args.methods}_test.npz"),
+                    "all": os.path.join(abs_output_dir, f"{args.methods}_data.npz")}
+        condition = all([os.path.isfile(f) for f in out_files.values()])
+    if not condition:
+        training_data = []
+        for f in Path(abs_input_dir).rglob(f"*{args.assign_ext}"):
+            cluster_dir = os.path.dirname(f)
+            f_basename = os.path.basename(f)
+            protein = f_basename[0:f_basename.index('.')]
+            predictions = dict()
+            for predictor in predictors:
+                prediction_path = os.path.join(cluster_dir, predictor, f"{protein}{args.pred_ext}")
+                predictions[predictor] = get_single_record_fasta(prediction_path)
+            assignment = get_single_record_fasta(f)
+            if args.mutation_file:
+                mut_path = os.path.join(cluster_dir, args.mutation_file)
+                mutations = mutations_in_protein(read_mutations(mut_path), protein)
+                if len(mutations) != 1:
+                    continue
+                mut_position = mutations[0].position_
+                x = mutation_nominal_data(predictions.values(), mut_position, np.uint8)
+                y = nominal_data([assignment.seq], np.uint8)
+            else:
+                x = nominal_data(predictions.values(), np.uint8)
+                y = nominal_data([assignment.seq], np.uint8)
+            data = {"x": x, "y": y}
+            training_data.append(data)
+        df = pd.DataFrame.from_dict(training_data)
+        data_process(args, df, out_files)
+    else:
+        print("Skipped process since output files already exist")
 
 main()

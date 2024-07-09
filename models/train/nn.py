@@ -1,15 +1,16 @@
 import sys
 import os
 import argparse
-import torch
-from torch import nn
-import torch.optim.lr_scheduler as lr_scheduler
-from torch.utils.data import TensorDataset, DataLoader, random_split, default_collate
+import lightning as L
+from lightning.pytorch.callbacks.early_stopping import EarlyStopping
+from lightning.pytorch.callbacks import ModelCheckpoint
+from torch.utils.data import DataLoader, random_split
 
 sys.path.insert(1, os.path.dirname(os.path.dirname(sys.path[0])))
 sys.path.insert(1, os.path.dirname(sys.path[0]))
 from common import *
-from nn_models import select_model, select_device, CustomDataset
+from data_preprocess import onehot_preprocess
+from nn_models import select_model, select_device, CustomDataset, LitModel, Simplest
 
 def parse_commandline():
     parser = argparse.ArgumentParser(description='Neural network training script')
@@ -23,55 +24,20 @@ def parse_commandline():
                     help='Amount of predictors in input data')
     return parser.parse_args()
 
-def train(dataloader, model, loss_fn, optimizer, device):
-    size = len(dataloader.dataset)
-    model.train()
-    for batch, (X, y) in enumerate(dataloader):
-        X, y = X.to(device), y.to(device)
-        # Compute prediction error
-        pred = model(X)
-        loss = loss_fn(pred, y)
-        # Backpropagation
-        loss.backward()
-        optimizer.step()
-        optimizer.zero_grad()
-        if batch % 5 == 0:
-            loss, current = loss.item(), (batch + 1) * len(X)
-            print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
-
-def evaluate(model, X_test, y_test):
-    model.eval()
-    y_pred = model(X_test)
-    acc = (y_pred.argmax(2) == y_test.argmax(2)).type(torch.float).mean().item()
-    acc = float(acc) * 100
-    return acc
-
 def commands(args, X, y):
+    out_dir = os.path.dirname(args.out_file)
+    out_fname = os.path.basename(args.out_file)
     ds = CustomDataset(X, y, x_transform=onehot_preprocess, y_transform=onehot_preprocess)
-    train_set, test_set = random_split(ds, [0.9, 0.1])
-    train_dataloader = DataLoader(train_set, shuffle=True, batch_size=8)
-    X_test, y_test = default_collate(test_set)
-    model = args.NNModel(args.predictors).to(args.device)
-    loss_fn = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
-    scheduler = lr_scheduler.LinearLR(optimizer, start_factor=1.0, end_factor=0.1, total_iters=50)
-    epochs = 100
-    early_stop_thresh = 5
-    best_accuracy = -1
-    best_epoch = -1
-    for cur_epoch in range(epochs):
-        print(f"Epoch {cur_epoch+1}\n-------------------------------")
-        train(train_dataloader, model, loss_fn, optimizer, args.device)
-        acc = evaluate(model, X_test, y_test)
-        print(f"End of epoch {cur_epoch}: accuracy = {acc:.2f}%")
-        if acc > best_accuracy:
-            best_accuracy = acc
-            best_epoch = cur_epoch
-            torch.save(model.state_dict(), args.out_file)
-        elif cur_epoch - best_epoch > early_stop_thresh:
-            print(f"Early stopped training at epoch {cur_epoch}")
-            break
-        scheduler.step()
+    train_set, val_set = random_split(ds, [0.9, 0.1])
+    train_dataloader = DataLoader(train_set, shuffle=True, batch_size=4)
+    val_dataloader = DataLoader(val_set)
+    model = LitModel(args.NNModel(args.predictors))
+    trainer = L.Trainer(default_root_dir=f"{out_dir}/nn/",
+                        max_epochs=100,
+                        callbacks=[EarlyStopping(monitor="val_acc", mode="max", patience=20),
+                                   ModelCheckpoint(monitor='val_acc', save_top_k=1, dirpath=out_dir, filename=out_fname)],
+                        num_sanity_val_steps=0)
+    trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
 
 def main():
     args = parse_commandline()

@@ -1,8 +1,22 @@
 import math
 import torch
+import lightning as L
 from torch import nn
-import torch.nn.functional as F
+from torch.nn import functional as F
 from torch.utils.data import Dataset
+
+class Simplest(nn.Module):
+    def __init__(self, num_predictors, classes=9, seq_len=128):
+        super(Simplest, self).__init__()
+        self.classes = classes
+        self.seq_len = seq_len
+        self.hidden = nn.Sequential(nn.Linear(seq_len*num_predictors*classes, seq_len),
+                                    nn.ReLU(),
+                                    nn.Dropout(0.1))
+
+    def forward(self, x):
+        self.hidden(x.reshape(x.shape[0], -1))
+        return x[:,0,0:self.seq_len,:]
 
 class FCNN(nn.Module):
     def __init__(self, num_predictors, classes=9, seq_len=1024):
@@ -23,26 +37,33 @@ class FCNN(nn.Module):
         return out
     
 class CNN(nn.Module):
-    def __init__(self, num_predictors, classes=9, seq_len=1024):
+    def __init__(self, num_predictors, classes=9, seq_len=512):
         super(CNN, self).__init__()
         self.classes = classes
+        self.predictors = num_predictors
         self.seq_len = seq_len
-        self.conv = nn.Sequential(nn.Conv1d(in_channels=classes,
-                                            out_channels=classes, kernel_size=21),
+        self.conv1 = nn.Sequential(nn.Conv2d(in_channels=num_predictors,
+                                            out_channels=32, kernel_size=(17,5), padding='same'),
                                     nn.ReLU(),
-                                    nn.MaxPool1d(4),
-                                    nn.Dropout(0.5))
-        self.hidden = nn.Sequential(nn.Linear(classes*2299, seq_len),
+                                    nn.Dropout(0.2))
+        self.conv2 = nn.Sequential(nn.Conv2d(in_channels=32,
+                                            out_channels=2, kernel_size=(17,21), padding='same'),
+                                    nn.ReLU(),
+                                    nn.Dropout(0.2))
+        self.hidden = nn.Sequential(nn.Linear(2*classes*(seq_len), seq_len),
                                     nn.ReLU(),
                                     nn.Dropout(0.5))
         self.out = nn.Linear(seq_len, seq_len*classes)
 
     def forward(self, x):
-        x = x.permute(0, 2, 1)
-        features = self.conv(x).squeeze(dim=-1)
+        bsize = x.shape[0]
+        x = x.permute(0, 1, 3, 2)
+        features = self.conv1(x)
+        features = self.conv2(features)
+        features += x
         features = features.reshape(features.shape[0], -1)
         hidden = self.hidden(features)
-        out = self.out(hidden).reshape(x.shape[0], self.seq_len, self.classes)
+        out = self.out(hidden).reshape(bsize, self.seq_len, self.classes)
         return out
     
 class RNN(nn.Module):
@@ -60,7 +81,7 @@ class RNN(nn.Module):
 
     def forward(self, x):
         rnn, _ = self.bilstm(x)
-        hidden = self.fc1(torch.ravel(rnn, 1))
+        hidden = self.fc1(torch.flatten(rnn, 1))
         out = self.fc2(hidden).squeeze(dim=-1).reshape(x.shape[0], self.seq_len, self.classes)
         return out
     
@@ -88,10 +109,7 @@ class TNN(nn.Module):
         src = self.embedding(src) * math.sqrt(self.d_model)
         src = self.pos_encoder(src)
         if src_mask is None:
-            """Generate a square causal mask for the sequence. The masked positions are filled with float('-inf').
-            Unmasked positions are filled with float(0.0).
-            """
-            src_mask = nn.Transformer.generate_square_subsequent_mask(src.shape[1]).to(self.device)
+            src_mask = nn.Transformer.generate_square_subsequent_mask(src.shape[1])
         output = self.transformer_encoder(src, src_mask)
         out = self.linear(output)
         return out
@@ -154,3 +172,64 @@ class CustomDataset(Dataset):
 
     def __len__(self):
         return len(self.y)
+
+class LitModel(L.LightningModule):
+    def __init__(self, nnModel):
+        super().__init__()
+        self.nnModel = nnModel
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.nnModel.parameters(), lr=1e-2)
+        lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5)
+        return [optimizer], [lr_scheduler]
+
+    def training_step(self, batch, batch_idx):
+        x, y = batch
+        y = y.squeeze(1)
+        y_hat = []
+        seq_chunk = 512
+        for i in range(1024//seq_chunk):
+            input_cut = x[:,:,i*seq_chunk:(i+1)*seq_chunk]
+            completely_masked = torch.zeros_like(input_cut)
+            completely_masked[:,:,:,0] = 1
+            if torch.equal(input_cut, completely_masked):
+                empty_chunk = torch.zeros_like(y_hat[0])
+                empty_chunk[:,:,0] = 1
+                y_hat.append(empty_chunk)
+            else:
+                y_hat.append(self.nnModel(input_cut))
+        loss = F.binary_cross_entropy_with_logits(torch.cat(y_hat, 1), y)
+        return loss
+    
+    def validation_step(self, batch, batch_idx):
+        x, y = batch
+        y = y.squeeze(1)
+        y_hat = []
+        seq_chunk = 512
+        for i in range(1024//seq_chunk):
+            input_cut = x[:,:,i*seq_chunk:(i+1)*seq_chunk]
+            completely_masked = torch.zeros_like(input_cut)
+            completely_masked[:,:,:,0] = 1
+            if torch.equal(input_cut, completely_masked):
+                empty_chunk = torch.zeros_like(y_hat[0])
+                empty_chunk[:,:,0] = 1
+                y_hat.append(empty_chunk)
+            else:
+                y_hat.append(self.nnModel(input_cut))
+        y_hat = torch.cat(y_hat, 1)
+        val_loss = F.binary_cross_entropy_with_logits(y_hat, y)
+        self.log("val_loss", val_loss)
+        acc = (y_hat.argmax(2) == y.argmax(2)).type(torch.float).mean().item()
+        self.log("val_acc", acc)
+
+    def test_step(self, batch, batch_idx):
+        x, y = batch
+        y = y.squeeze(1)
+        y_hat = self.encoder(x)
+        test_loss = F.binary_cross_entropy_with_logits(y_hat, y)
+        self.log("test_loss", test_loss)
+
+    def predict_step(self, batch, batch_idx):
+        x, y = batch
+        pred = self.encoder(x)
+        return pred

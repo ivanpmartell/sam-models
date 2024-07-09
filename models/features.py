@@ -7,6 +7,7 @@ from sklearn.feature_selection import SelectKBest, chi2, f_classif, mutual_info_
 
 sys.path.insert(1, os.path.dirname(sys.path[0]))
 from common import *
+from data_preprocess import *
 
 def parse_commandline():
     parser = argparse.ArgumentParser(description='Random forest training script')

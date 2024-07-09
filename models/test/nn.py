@@ -8,7 +8,7 @@ from torch.utils.data import TensorDataset, DataLoader
 sys.path.insert(1, os.path.dirname(os.path.dirname(sys.path[0])))
 sys.path.insert(1, os.path.dirname(sys.path[0]))
 from common import *
-from nn_models import select_model, select_device, CustomDataset
+from nn_models import select_model, select_device, CustomDataset, LitModel
 
 def parse_commandline():
     parser = argparse.ArgumentParser(description='Neural network testing script')
@@ -42,10 +42,8 @@ def test(dataloader, model, loss_fn, device):
 def commands(args, X, y):
     ds = CustomDataset(X, y, x_transform=frequency_preprocess, y_transform=onehot_preprocess)
     train_dataloader = DataLoader(ds, batch_size=1)
-    model = args.NNModel().to(args.device)
-    loss_fn = nn.CrossEntropyLoss()
-    model.load_state_dict(torch.load(args.params))
-    return test(train_dataloader, model, loss_fn, args.device)
+    model = LitModel(args.NNModel).load_from_checkpoint(args.params)
+    return model.test()
 
 def main():
     args = parse_commandline()
