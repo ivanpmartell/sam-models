@@ -27,7 +27,7 @@ def parse_commandline():
     parser.add_argument('--mutation_file', type=str,
                         help='Filename of mutation files. Usually "mutations.txt". Leave empty to not use mutation data')
     parser.add_argument('--params', type=str, required=True,
-                    help='Pretrained parameters file')
+                    help='Pretrained parameters (checkpoint) file')
     parser.add_argument('--seq_len', type=int, default=1024,
                     help='Maximum sequence length of inputs.')
     parser.add_argument('--preprocess', type=str, default="frequency_max_location",

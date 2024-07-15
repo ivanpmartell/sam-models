@@ -20,7 +20,7 @@ def parse_commandline():
     parser.add_argument('--model', type=str, required=True,
                     help='Type of neural network model to use')
     parser.add_argument('--params', type=str, required=True,
-                    help='Pretrained parameters file')
+                    help='Pretrained parameters (checkpoint) file')
     parser.add_argument('--methods', type=str,
                         help='Keyword or Comma separated list of methods to include in majority consensus prediction. Keywords: all, top, avg, low',
                         default="all")

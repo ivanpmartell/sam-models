@@ -1,6 +1,5 @@
 .vscode
 *.npz
-*.params
 *.ckpt
 *.sspfa
 *.res

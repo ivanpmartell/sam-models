@@ -5,19 +5,6 @@ from torch import nn
 from torch.nn import functional as F
 from torch.utils.data import Dataset
 
-class Simplest(nn.Module):
-    def __init__(self, num_predictors, classes=9, seq_len=128):
-        super(Simplest, self).__init__()
-        self.classes = classes
-        self.seq_len = seq_len
-        self.hidden = nn.Sequential(nn.Linear(seq_len*num_predictors*classes, seq_len),
-                                    nn.ReLU(),
-                                    nn.Dropout(0.1))
-
-    def forward(self, x):
-        self.hidden(x.reshape(x.shape[0], -1))
-        return x[:,0,0:self.seq_len,:]
-
 class FCNN(nn.Module):
     def __init__(self, num_predictors, classes=9, seq_len=1024):
         super(FCNN, self).__init__()
@@ -27,43 +14,37 @@ class FCNN(nn.Module):
                                     nn.ReLU(),
                                     nn.Linear(seq_len*classes, seq_len),
                                     nn.ReLU(),
-                                    nn.Dropout(0.1))
-        self.out = nn.Linear(seq_len, seq_len*classes)
-
-    def forward(self, x):
-        x = x.reshape(x.shape[0], -1)
-        hidden = self.hidden(x)
-        out = self.out(hidden).reshape(x.shape[0], self.seq_len, self.classes)
-        return out
-    
-class CNN(nn.Module):
-    def __init__(self, num_predictors, classes=9, seq_len=512):
-        super(CNN, self).__init__()
-        self.classes = classes
-        self.predictors = num_predictors
-        self.seq_len = seq_len
-        self.conv1 = nn.Sequential(nn.Conv2d(in_channels=num_predictors,
-                                            out_channels=32, kernel_size=(17,5), padding='same'),
-                                    nn.ReLU(),
-                                    nn.Dropout(0.2))
-        self.conv2 = nn.Sequential(nn.Conv2d(in_channels=32,
-                                            out_channels=2, kernel_size=(17,21), padding='same'),
-                                    nn.ReLU(),
-                                    nn.Dropout(0.2))
-        self.hidden = nn.Sequential(nn.Linear(2*classes*(seq_len), seq_len),
-                                    nn.ReLU(),
                                     nn.Dropout(0.5))
         self.out = nn.Linear(seq_len, seq_len*classes)
 
     def forward(self, x):
         bsize = x.shape[0]
-        x = x.permute(0, 1, 3, 2)
+        x = x.reshape(bsize, -1)
+        x = self.hidden(x)
+        x = self.out(x).reshape(bsize, self.classes, self.seq_len)
+        return x
+    
+class CNN(nn.Module):
+    def __init__(self, num_predictors, classes=9, seq_len=1024):
+        super(CNN, self).__init__()
+        self.classes = classes
+        self.predictors = num_predictors
+        self.seq_len = seq_len
+        self.conv1 = nn.Sequential(nn.Conv2d(in_channels=classes,
+                                            out_channels=classes, kernel_size=(5,17), padding='same'),
+                                    nn.ReLU(),
+                                    nn.Dropout(0.2))
+        self.hidden = nn.Sequential(nn.Linear(classes*seq_len*num_predictors, seq_len*classes),
+                                    nn.ReLU(),
+                                    nn.Dropout(0.5))
+        self.out = nn.Linear(seq_len*classes, seq_len*classes)
+
+    def forward(self, x):
+        bsize = x.shape[0]
         features = self.conv1(x)
-        features = self.conv2(features)
-        features += x
         features = features.reshape(features.shape[0], -1)
         hidden = self.hidden(features)
-        out = self.out(hidden).reshape(bsize, self.seq_len, self.classes)
+        out = self.out(hidden).reshape(bsize, self.classes, self.seq_len)
         return out
     
 class RNN(nn.Module):
@@ -71,25 +52,30 @@ class RNN(nn.Module):
         super(RNN, self).__init__()
         self.classes = classes
         self.seq_len = seq_len
+        self.predictors = num_predictors
         self.bilstm = nn.LSTM(
-            classes, 32, 2, bias=True,
+            seq_len, 32, 2, bias=True,
             batch_first=True, dropout=0.5, bidirectional=True)
-        self.fc1 = nn.Sequential(nn.Linear(32*2*seq_len, seq_len),
+        self.fc1 = nn.Sequential(nn.Linear(32*2*classes*num_predictors, seq_len*classes),
                                  nn.ReLU(),
                                  nn.Dropout(0.5))
-        self.fc2 = nn.Linear(seq_len, seq_len*classes)
+        self.fc2 = nn.Linear(seq_len*classes, seq_len*classes)
 
     def forward(self, x):
-        rnn, _ = self.bilstm(x)
-        hidden = self.fc1(torch.flatten(rnn, 1))
-        out = self.fc2(hidden).squeeze(dim=-1).reshape(x.shape[0], self.seq_len, self.classes)
-        return out
+        bsize = x.shape[0]
+        rnns =[]
+        for i in range(self.predictors):
+            rnn, _ = self.bilstm(x[:,:,:,i])
+            rnns.append(rnn)
+        x = torch.stack(rnns, dim=-1)
+        x = self.fc1(torch.flatten(x, 1))
+        x = self.fc2(x).squeeze(dim=-1).reshape(bsize, self.classes, self.seq_len)
+        return x
     
 class TNN(nn.Module):
     def __init__(self, num_predictors, classes=9, seq_len=1024, d_model = 32, nhead = 2, d_hid = 128,
                  nlayers = 2, dropout = 0.5):
         super(TNN, self).__init__()
-        self.device = select_device(False)
         self.pos_encoder = PosEncoding(d_model, dropout, seq_len)
         encoder_layers = nn.TransformerEncoderLayer(d_model, nhead, d_hid, dropout, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layers, nlayers)
@@ -105,6 +91,7 @@ class TNN(nn.Module):
         self.linear.weight.data.uniform_(-initrange, initrange)
 
     def forward(self, x, src_mask = None):
+        x = x.permute((0, 2, 1, 3))
         src = x.argmax(2)
         src = self.embedding(src) * math.sqrt(self.d_model)
         src = self.pos_encoder(src)
@@ -128,7 +115,7 @@ class PosEncoding(nn.Module):
         out = x + self.pe[:x.size(0)]
         return self.dropout(out)
 
-def select_model(model):
+def select_model(model: str) -> callable:
     model = model.lower()
     if "fullyconnected" in model:
         return FCNN
@@ -168,15 +155,20 @@ class CustomDataset(Dataset):
         y = self.y[index]
         if self.y_transform:
             y = self.y_transform(y)
-        return torch.Tensor(x), torch.Tensor(y)
+            y = torch.Tensor(y)
+        else:
+            y = torch.LongTensor(y)
+        return torch.Tensor(x), y
 
     def __len__(self):
         return len(self.y)
 
 class LitModel(L.LightningModule):
-    def __init__(self, nnModel):
+    def __init__(self, nnModel, win_size, max_len):
         super().__init__()
         self.nnModel = nnModel
+        self.win_size = win_size
+        self.max_len = max_len
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.nnModel.parameters(), lr=1e-2)
@@ -185,48 +177,51 @@ class LitModel(L.LightningModule):
 
     def training_step(self, batch, batch_idx):
         x, y = batch
-        y = y.squeeze(1)
+        y = y.squeeze(-1)
         y_hat = []
-        seq_chunk = 512
-        for i in range(1024//seq_chunk):
-            input_cut = x[:,:,i*seq_chunk:(i+1)*seq_chunk]
+        for i in range(self.max_len // self.win_size):
+            input_cut = x[:,:,i*self.win_size:(i+1)*self.win_size]
             completely_masked = torch.zeros_like(input_cut)
-            completely_masked[:,:,:,0] = 1
+            completely_masked[:,0,:,:] = 1
             if torch.equal(input_cut, completely_masked):
                 empty_chunk = torch.zeros_like(y_hat[0])
-                empty_chunk[:,:,0] = 1
+                empty_chunk[:,0,:] = 1
                 y_hat.append(empty_chunk)
             else:
                 y_hat.append(self.nnModel(input_cut))
-        loss = F.binary_cross_entropy_with_logits(torch.cat(y_hat, 1), y)
+        loss = F.cross_entropy(torch.cat(y_hat, 2), y)
         return loss
     
     def validation_step(self, batch, batch_idx):
         x, y = batch
-        y = y.squeeze(1)
+        y = y.squeeze(-1)
         y_hat = []
-        seq_chunk = 512
-        for i in range(1024//seq_chunk):
+        seq_chunk = self.win_size
+        for i in range(self.max_len // seq_chunk):
             input_cut = x[:,:,i*seq_chunk:(i+1)*seq_chunk]
             completely_masked = torch.zeros_like(input_cut)
-            completely_masked[:,:,:,0] = 1
+            completely_masked[:,0,:,:] = 1
             if torch.equal(input_cut, completely_masked):
                 empty_chunk = torch.zeros_like(y_hat[0])
-                empty_chunk[:,:,0] = 1
+                empty_chunk[:,0,:] = 1
                 y_hat.append(empty_chunk)
             else:
                 y_hat.append(self.nnModel(input_cut))
-        y_hat = torch.cat(y_hat, 1)
-        val_loss = F.binary_cross_entropy_with_logits(y_hat, y)
+        y_hat = torch.cat(y_hat, 2)
+        val_loss = F.cross_entropy(y_hat, y)
         self.log("val_loss", val_loss)
-        acc = (y_hat.argmax(2) == y.argmax(2)).type(torch.float).mean().item()
+        if y.dtype is torch.long:
+            target = y
+        else:
+            target = y.argmax(1)
+        acc = (y_hat.argmax(1) == target).type(torch.float).mean().item()
         self.log("val_acc", acc)
 
     def test_step(self, batch, batch_idx):
         x, y = batch
         y = y.squeeze(1)
         y_hat = self.encoder(x)
-        test_loss = F.binary_cross_entropy_with_logits(y_hat, y)
+        test_loss = F.cross_entropy(y_hat, y)
         self.log("test_loss", test_loss)
 
     def predict_step(self, batch, batch_idx):

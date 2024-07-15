@@ -19,7 +19,7 @@ def parse_commandline():
     parser.add_argument('--model', type=str, required=True,
                     help='Type of neural network model to use')
     parser.add_argument('--params', type=str, required=True,
-                    help='Pretrained parameters file')
+                    help='Pretrained parameters (checkpoint) file')
     return parser.parse_args()
 
 def test(dataloader, model, loss_fn, device):

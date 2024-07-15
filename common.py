@@ -116,12 +116,26 @@ def work_on_predicting(args, cmds, predictors):
 def work_on_training(args, cmds):
     abs_input = os.path.abspath(args.input)
     abs_output_dir = missing_output_is_input(args, os.path.dirname(abs_input))
-    out_file = os.path.join(abs_output_dir, f"{args.model}_trained.params")
+    out_file = os.path.join(abs_output_dir, f"{args.model}_trained.ckpt")
     if not os.path.exists(out_file):
         args.out_file = out_file
         X, y = load_npz(abs_input)
         cmds(args, X, y)
         print("Training Done!")
+
+
+def remove_ckpt_ext(p: str):
+    """Removes the .ckpt extension for save files
+
+    ### Parameters
+    1. p : str
+        - Path of the save file
+
+    ### Returns
+    - str
+        - Path without the extension
+    """
+    return p[:-5]
 
 def work_on_testing(args, cmds):
     args.params = os.path.abspath(args.params)

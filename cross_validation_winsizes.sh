@@ -18,7 +18,7 @@ for i in ${plist[@]}; do
         if [[ $missing_file == "T" ]]; then
             python models/cross_validation.py $input_clusters_folder --out_dir $output_processing_folder --model forest_win_$i --methods $m --split_size $split --preprocess nominal_windowed --win_side_len $i
             for ((j = 0; j <= split; j++)); do
-                rm "$output_processing_folder/fold$j/forest_win_${i}_${m}.params"
+                rm "$output_processing_folder/fold$j/forest_win_${i}_${m}.ckpt"
             done
         fi
     done

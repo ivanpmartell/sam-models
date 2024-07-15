@@ -18,7 +18,7 @@ def parse_commandline():
     parser.add_argument('--model', type=str, default="forest",
                     help='Name to use for this model')
     parser.add_argument('--params', type=str, required=True,
-                    help='Pretrained parameters file')
+                    help='Pretrained parameters (checkpoint) file')
     parser.add_argument('--preprocess', type=str, default="frequency_max_location",
                     help='Type of preprocessing for input data. Choices: nominal_location, frequency_location, frequency_max_location')
     parser.add_argument('--seq_len', type=int, default=1024,
