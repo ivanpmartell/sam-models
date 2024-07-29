@@ -174,7 +174,7 @@ class CustomDataset(Dataset):
 class LitModel(L.LightningModule):
     def __init__(self, nnModel, win_size, max_len, predictors):
         super().__init__()
-        self.nnModel = nnModel(predictors, seq_len=win_size, device=self.device)
+        self.nnModel = nnModel(predictors, seq_len=win_size, device=self.trainer.strategy.root_device)
         self.win_size = win_size
         self.max_len = max_len
 
