@@ -1,4 +1,3 @@
-#Feature selection with sklearn chi square, anova, etc
 import os
 import sys
 import argparse
@@ -7,7 +6,7 @@ from sklearn.feature_selection import SelectKBest, chi2, f_classif, mutual_info_
 
 sys.path.insert(1, os.path.dirname(sys.path[0]))
 from common import *
-from data_preprocess import *
+from data_preprocess import choose_preprocess, single_target_preprocess
 
 def parse_commandline():
     parser = argparse.ArgumentParser(description='Random forest training script')

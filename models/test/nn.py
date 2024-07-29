@@ -1,14 +1,14 @@
 import sys
 import os
 import argparse
-import torch
-from torch import nn
-from torch.utils.data import TensorDataset, DataLoader
+import lightning as L
+from torch.utils.data import DataLoader
 
 sys.path.insert(1, os.path.dirname(os.path.dirname(sys.path[0])))
 sys.path.insert(1, os.path.dirname(sys.path[0]))
 from common import *
-from nn_models import select_model, select_device, CustomDataset, LitModel
+from data_preprocess import onehot_preprocess
+from nn_models import select_model, CustomDataset, LitModel
 
 def parse_commandline():
     parser = argparse.ArgumentParser(description='Neural network testing script')
@@ -20,35 +20,26 @@ def parse_commandline():
                     help='Type of neural network model to use')
     parser.add_argument('--params', type=str, required=True,
                     help='Pretrained parameters (checkpoint) file')
+    parser.add_argument('--predictors', type=int, required=True,
+                    help='Amount of predictors in input data')
+    parser.add_argument('--win_len', type=int, default=1024,
+                    help='Length of the window to be used')
+    parser.add_argument('--seq_len', type=int, default=1024,
+                    help='Maximum sequence length')
     return parser.parse_args()
 
-def test(dataloader, model, loss_fn, device):
-    size = len(dataloader.dataset)*1024
-    num_batches = len(dataloader)
-    model.eval()
-    test_loss, correct = 0, 0
-    with torch.no_grad():
-        for X, y in dataloader:
-            X, y = X.to(device), y.to(device)
-            pred = model(X)
-            test_loss += loss_fn(pred, y).item()
-            correct += (pred.argmax(2) == y.argmax(2)).type(torch.float).sum().item()
-    test_loss /= num_batches
-    correct /= size
-    test_acc = 100*correct
-    print(f"Accuracy: {(test_acc):>0.1f}%, Avg loss: {test_loss:>8f} \n")
-    return test_acc
-
 def commands(args, X, y):
-    ds = CustomDataset(X, y, x_transform=frequency_preprocess, y_transform=onehot_preprocess)
-    train_dataloader = DataLoader(ds, batch_size=1)
-    model = LitModel(args.NNModel).load_from_checkpoint(args.params)
-    return model.test()
+    out_dir = os.path.dirname(args.out_file)
+    ds = CustomDataset(X, y, x_transform=onehot_preprocess)
+    test_dataloader = DataLoader(ds, batch_size=1)
+    model = args.NNModel(args.predictors, seq_len=args.win_len)
+    trained_model = LitModel.load_from_checkpoint(args.params, nnModel=model, win_size=args.win_len, max_len=args.seq_len)
+    trainer = L.Trainer(default_root_dir=f"{out_dir}/nn/", num_sanity_val_steps=0)
+    return trainer.test(model=trained_model, dataloaders=test_dataloader)
 
 def main():
     args = parse_commandline()
     args.NNModel = select_model(args.model)
-    args.device = select_device()
     work_on_testing(args, commands)
 
 main()

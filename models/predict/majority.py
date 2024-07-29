@@ -22,9 +22,11 @@ def parse_commandline():
                         default="all")
     parser.add_argument('--model', type=str, default="majority",
                     help='Name to use for this model')
+    parser.add_argument('--mutation_file', type=str,
+                        help='Filename of mutation files. Usually "mutations.txt". Leave empty to not use mutation data')
     return parser.parse_args()
 
-def commands(args, predictions):
+def commands(args, predictions, mut_position=None):
     first_pred = next(iter(predictions.values()))
     preds_len = len(first_pred.seq)
     classes = list(get_ss_q8())

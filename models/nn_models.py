@@ -80,8 +80,8 @@ class TNN(nn.Module):
         encoder_layers = nn.TransformerEncoderLayer(d_model, nhead, d_hid, dropout, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layers, nlayers)
         self.embedding = nn.Embedding(classes, d_model)
-        self.d_model = d_model
         self.linear = nn.Linear(d_model, classes)
+        self.d_model = d_model
         self.init_weights()
 
     def init_weights(self) -> None:
@@ -91,15 +91,22 @@ class TNN(nn.Module):
         self.linear.weight.data.uniform_(-initrange, initrange)
 
     def forward(self, x, src_mask = None):
-        x = x.permute((0, 2, 1, 3))
-        src = x.argmax(2)
-        src = self.embedding(src) * math.sqrt(self.d_model)
-        src = self.pos_encoder(src)
-        if src_mask is None:
-            src_mask = nn.Transformer.generate_square_subsequent_mask(src.shape[1])
-        output = self.transformer_encoder(src, src_mask)
-        out = self.linear(output)
-        return out
+        src = x.argmax(1)
+        src_list = []
+        for i in range(x.shape[-1]):
+            src_list.append(src[:,:,i])
+        out_list = []
+        for src in src_list:
+            src = self.embedding(src) * math.sqrt(self.d_model)
+            src = self.pos_encoder(src)
+            if src_mask is None:
+                src_mask = nn.Transformer.generate_square_subsequent_mask(src.shape[1])
+            output = self.transformer_encoder(src, src_mask)
+            out_list.append(self.linear(output))
+        out = torch.zeros_like(out_list[0])
+        for i in range(x.shape[-1]):
+            out += out_list[i]
+        return out.permute(0,2,1)
 
 class PosEncoding(nn.Module):
     def __init__(self, d_model: int, dropout: float, max_len: int):
@@ -107,12 +114,12 @@ class PosEncoding(nn.Module):
         self.dropout = nn.Dropout(p=dropout)
         position = torch.arange(max_len).unsqueeze(1)
         div_term = torch.exp(torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model)).unsqueeze(0)
-        self.pe = torch.zeros(max_len, 1, d_model)
-        self.pe[:, 0, 0::2] = torch.sin(position * div_term)
-        self.pe[:, 0, 1::2] = torch.cos(position * div_term)
+        self.pe = torch.zeros(max_len, d_model)
+        self.pe[:, 0::2] = torch.sin(position * div_term)
+        self.pe[:, 1::2] = torch.cos(position * div_term)
 
     def forward(self, x):
-        out = x + self.pe[:x.size(0)]
+        out = x + self.pe[:x.size(1)]
         return self.dropout(out)
 
 def select_model(model: str) -> callable:
@@ -189,7 +196,15 @@ class LitModel(L.LightningModule):
                 y_hat.append(empty_chunk)
             else:
                 y_hat.append(self.nnModel(input_cut))
-        loss = F.cross_entropy(torch.cat(y_hat, 2), y)
+        y_hat = torch.cat(y_hat, 2)
+        loss = F.cross_entropy(y_hat, y)
+        self.log("train_loss", loss, on_epoch=True)
+        if y.dtype is torch.long:
+            target = y
+        else:
+            target = y.argmax(1)
+        acc = (y_hat.argmax(1) == target).type(torch.float).mean().item()
+        self.log("train_acc", acc, on_epoch=True)
         return loss
     
     def validation_step(self, batch, batch_idx):
@@ -209,22 +224,54 @@ class LitModel(L.LightningModule):
                 y_hat.append(self.nnModel(input_cut))
         y_hat = torch.cat(y_hat, 2)
         val_loss = F.cross_entropy(y_hat, y)
-        self.log("val_loss", val_loss)
+        self.log("val_loss", val_loss, on_epoch=True)
         if y.dtype is torch.long:
             target = y
         else:
             target = y.argmax(1)
         acc = (y_hat.argmax(1) == target).type(torch.float).mean().item()
-        self.log("val_acc", acc)
+        self.log("val_acc", acc, on_epoch=True)
 
     def test_step(self, batch, batch_idx):
         x, y = batch
-        y = y.squeeze(1)
-        y_hat = self.encoder(x)
+        y = y.squeeze(-1)
+        y_hat = []
+        seq_chunk = self.win_size
+        for i in range(self.max_len // seq_chunk):
+            input_cut = x[:,:,i*seq_chunk:(i+1)*seq_chunk]
+            completely_masked = torch.zeros_like(input_cut)
+            completely_masked[:,0,:,:] = 1
+            if torch.equal(input_cut, completely_masked):
+                empty_chunk = torch.zeros_like(y_hat[0])
+                empty_chunk[:,0,:] = 1
+                y_hat.append(empty_chunk)
+            else:
+                y_hat.append(self.nnModel(input_cut))
+        y_hat = torch.cat(y_hat, 2)
         test_loss = F.cross_entropy(y_hat, y)
-        self.log("test_loss", test_loss)
+        self.log("test_loss", test_loss, on_epoch=True)
+        if y.dtype is torch.long:
+            target = y
+        else:
+            target = y.argmax(1)
+        acc = (y_hat.argmax(1) == target).type(torch.float).mean().item()
+        self.log("test_acc", acc, on_epoch=True)
 
     def predict_step(self, batch, batch_idx):
-        x, y = batch
-        pred = self.encoder(x)
-        return pred
+        x, _ = batch
+        y_hat = []
+        seq_chunk = self.win_size
+        for i in range(self.max_len // seq_chunk):
+            input_cut = x[:,:,i*seq_chunk:(i+1)*seq_chunk]
+            completely_masked = torch.zeros_like(input_cut)
+            completely_masked[:,0,:,:] = 1
+            if torch.equal(input_cut, completely_masked):
+                empty_chunk = torch.zeros_like(y_hat[0])
+                empty_chunk[:,0,:] = 1
+                y_hat.append(empty_chunk)
+            else:
+                y_hat.append(self.nnModel(input_cut))
+        return torch.cat(y_hat, 2)
+    
+    def forward(self, x):
+        return self.nnModel(x)

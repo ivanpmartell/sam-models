@@ -122,6 +122,8 @@ def work_on_training(args, cmds):
         X, y = load_npz(abs_input)
         cmds(args, X, y)
         print("Training Done!")
+    else:
+        print("Training skipped")
 
 
 def remove_ckpt_ext(p: str):
@@ -140,15 +142,20 @@ def remove_ckpt_ext(p: str):
 def work_on_testing(args, cmds):
     args.params = os.path.abspath(args.params)
     if not os.path.exists(args.params):
-        print("Parameters file does not exist")
+        print("Parameters (Checkpoint) file does not exist")
         exit(1)
     abs_input = os.path.abspath(args.input)
     abs_output_dir = missing_output_is_input(args, os.path.dirname(args.params))
-    X, y = load_npz(abs_input)
-    score = cmds(args, X, y)
-    with open(os.path.join(abs_output_dir, f"{args.model}_score.res"), 'w') as file:
-        file.write(str(score))
-    print("Testing Done!")
+    out_file = os.path.join(abs_output_dir, f"{args.model}_score.res")
+    if not os.path.exists(out_file):
+        args.out_file = out_file
+        X, y = load_npz(abs_input)
+        score = cmds(args, X, y)
+        with open(out_file, 'w') as file:
+            file.write(str(score))
+        print("Testing Done!")
+    else:
+        print("Testing skipped")
 
 ### Data functions below
 class Mutation(NamedTuple):

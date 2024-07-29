@@ -7,7 +7,9 @@ import numpy as np
 import pickle
 
 sys.path.insert(1, os.path.dirname(os.path.dirname(sys.path[0])))
+sys.path.insert(1, os.path.dirname(sys.path[0]))
 from common import *
+from data_preprocess import nominal_data, mutation_nominal_data, nominal_location_preprocess, choose_preprocess
 
 def parse_commandline():
     parser = argparse.ArgumentParser(description='Mutation secondary structure forest predictor')
@@ -42,7 +44,7 @@ def preprocess(X, mut_position, max_len, pprocess):
         X = np.expand_dims(X, axis=0)
         return nominal_location_preprocess(X)
     else:
-        X = nominal_data(X)
+        X = nominal_data(X, numtype=int)
         X = np.expand_dims(X, axis=0)
         return pprocess(X, max_len)
 

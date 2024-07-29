@@ -39,9 +39,9 @@ def commands(args, X, y):
     l_model = LitModel(model, args.win_len, args.seq_len)
     trainer = L.Trainer(default_root_dir=f"{out_dir}/nn/",
                         max_epochs=100,
-                        callbacks=[EarlyStopping(monitor="val_acc", mode="max", patience=20),
-                                   ModelCheckpoint(monitor='val_acc', save_top_k=1, dirpath=out_dir, filename=out_fname)],
-                        num_sanity_val_steps=0)
+                        callbacks=[EarlyStopping(monitor="val_acc", mode="max", patience=10,  min_delta=0.0001),
+                                   ModelCheckpoint(monitor='val_acc',  mode="max", save_top_k=1, dirpath=out_dir, filename=out_fname)],
+                        num_sanity_val_steps=2)
     trainer.fit(model=l_model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
 
 def main():

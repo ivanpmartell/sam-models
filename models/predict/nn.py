@@ -2,14 +2,12 @@ import sys
 import os
 import argparse
 import torch
-from torch import nn
-import torch.nn.functional as F
-from torch.utils.data import TensorDataset, DataLoader
 
 sys.path.insert(1, os.path.dirname(os.path.dirname(sys.path[0])))
 sys.path.insert(1, os.path.dirname(sys.path[0]))
 from common import *
-from nn_models import select_model, select_device
+from data_preprocess import onehot_preprocess, nominal_data
+from nn_models import select_model, LitModel
 
 def parse_commandline():
     parser = argparse.ArgumentParser(description='Mutation secondary structure neural network predictor')
@@ -21,6 +19,12 @@ def parse_commandline():
                     help='Type of neural network model to use')
     parser.add_argument('--params', type=str, required=True,
                     help='Pretrained parameters (checkpoint) file')
+    parser.add_argument('--predictors', type=int, required=True,
+                    help='Amount of predictors in input data')
+    parser.add_argument('--win_len', type=int, default=1024,
+                    help='Length of the window to be used')
+    parser.add_argument('--seq_len', type=int, default=1024,
+                    help='Maximum sequence length')
     parser.add_argument('--methods', type=str,
                         help='Keyword or Comma separated list of methods to include in majority consensus prediction. Keywords: all, top, avg, low',
                         default="all")
@@ -30,33 +34,43 @@ def parse_commandline():
     parser.add_argument('--pred_ext', type=str,
                         help='Extension of ss prediction files',
                         default=".sspfa")
+    parser.add_argument('--mutation_file', type=str,
+                        help='Filename of mutation files. Usually "mutations.txt". Leave empty to not use mutation data')
     return parser.parse_args()
 
-def preprocess(predictions, preds_len):
-    classes = list(get_ss_q8())
-    freqs = np.zeros((1024,len(classes)))
-    for i in range(preds_len):
-        for prediction in predictions.values():
-            freqs[i, ss_index(prediction[i])] += 1
-    max_class_freqs = freqs.max(axis=0)
-    normalized_freqs = np.divide(freqs, max_class_freqs, out=np.zeros_like(freqs), where=max_class_freqs!=0)
-    return normalized_freqs
+def preprocess(X):
+    X = nominal_data(X, numtype=int)
+    X = np.expand_dims(X, axis=0)
+    return onehot_preprocess(X)
 
-def commands(args, predictions):
+def predict(args, X, trained_model):
+    trained_model.eval()
+    with torch.no_grad():
+        y_hat = []
+        seq_chunk = args.win_len
+        for i in range(args.seq_len // seq_chunk):
+            input_cut = X[:,:,i*seq_chunk:(i+1)*seq_chunk]
+            completely_masked = torch.zeros_like(input_cut)
+            completely_masked[:,0,:,:] = 1
+            if torch.equal(input_cut, completely_masked):
+                empty_chunk = torch.zeros_like(y_hat[0])
+                empty_chunk[:,0,:] = 1
+                y_hat.append(empty_chunk)
+            else:
+                y_hat.append(trained_model(input_cut))
+        return torch.cat(y_hat, 2)
+
+def commands(args, predictions, mut_position=None):
     first_pred = next(iter(predictions.values()))
     preds_len = len(first_pred.seq)
-    X = torch.Tensor(preprocess(predictions, preds_len))
-    X.unsqueeze_(0)
-    model = args.NNModel().to(args.device)
-    model.load_state_dict(torch.load(args.params))
-    model.eval()
+    X = torch.Tensor(preprocess(predictions.values()))
+    model = args.NNModel(args.predictors, seq_len=args.win_len)
+    trained_model = LitModel.load_from_checkpoint(args.params, nnModel=model, win_size=args.win_len, max_len=args.seq_len)
+    pred = predict(args, X, trained_model)
     result = ""
-    ss_q8 = get_ss_q8()
-    with torch.no_grad():
-        pred = model(X)
-        pred = F.log_softmax(pred, dim=2)
-        for i in (pred.argmax(2))[0,:preds_len]:
-            result += ss_q8[i]
+    q8_ss = get_ss_q8()
+    for i in (pred.argmax(1))[0,:preds_len]:
+        result += q8_ss[i]
     id_split = first_pred.id.split('_')
     out_id = f"{id_split[0]}_{id_split[1]}_{args.methods}_{args.model}"
     return {out_id: result}
@@ -64,7 +78,6 @@ def commands(args, predictions):
 def main():
     args = parse_commandline()
     args.NNModel = select_model(args.model)
-    args.device = select_device()
     predictors = choose_methods(args.methods)
     work_on_predicting(args, commands, predictors)
 

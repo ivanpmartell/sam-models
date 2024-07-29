@@ -70,10 +70,9 @@ def onehot_preprocess(Xy:np.ndarray, max_len:int=1024) -> np.ndarray:
     len_predictors = Xy.shape[-1]//max_len
     classes = list(get_ss_q8())
     if len(Xy.shape) > 1:
-        #TODO: make concated the right shape
-        concated = np.zeros((len(Xy), len(classes), max_len))
+        concated = np.zeros((len(Xy), len(classes), max_len, len_predictors))
         for i, prediction in enumerate(Xy):
-            concated[i] = onehot_encode(prediction)
+            concated[i] = np.dstack(np.split(onehot_encode(prediction),len_predictors,axis=1))
     else:
         concated = np.dstack(np.split(onehot_encode(Xy),len_predictors,axis=1))
     return concated

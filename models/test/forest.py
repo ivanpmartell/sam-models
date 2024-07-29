@@ -7,7 +7,9 @@ import numpy as np
 import pickle
 
 sys.path.insert(1, os.path.dirname(os.path.dirname(sys.path[0])))
+sys.path.insert(1, os.path.dirname(sys.path[0]))
 from common import *
+from data_preprocess import single_target_preprocess, choose_preprocess
 
 def parse_commandline():
     parser = argparse.ArgumentParser(description='Random forest testing script')

@@ -3,10 +3,11 @@ import os
 import argparse
 from sklearn.ensemble import BaggingClassifier
 from sklearn.tree import ExtraTreeClassifier
-import numpy as np
 
 sys.path.insert(1, os.path.dirname(os.path.dirname(sys.path[0])))
+sys.path.insert(1, os.path.dirname(sys.path[0]))
 from common import *
+from data_preprocess import single_target_preprocess, choose_preprocess
 
 def parse_commandline():
     parser = argparse.ArgumentParser(description='Random forest training script')
