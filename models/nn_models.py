@@ -100,7 +100,7 @@ class TNN(nn.Module):
             src = self.embedding(src) * math.sqrt(self.d_model)
             src = self.pos_encoder(src)
             if src_mask is None:
-                src_mask = nn.Transformer.generate_square_subsequent_mask(src.shape[1])
+                src_mask = nn.Transformer.generate_square_subsequent_mask(src.shape[1], device=self.device)
             output = self.transformer_encoder(src, src_mask)
             out_list.append(self.linear(output))
         out = torch.zeros_like(out_list[0])
@@ -114,7 +114,7 @@ class PosEncoding(nn.Module):
         self.dropout = nn.Dropout(p=dropout)
         position = torch.arange(max_len).unsqueeze(1)
         div_term = torch.exp(torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model)).unsqueeze(0)
-        self.pe = torch.zeros(max_len, d_model)
+        self.register_buffer("pe", torch.zeros(max_len, d_model))
         self.pe[:, 0::2] = torch.sin(position * div_term)
         self.pe[:, 1::2] = torch.cos(position * div_term)
 
