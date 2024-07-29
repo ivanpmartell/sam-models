@@ -6,7 +6,7 @@ from torch.nn import functional as F
 from torch.utils.data import Dataset
 
 class FCNN(nn.Module):
-    def __init__(self, num_predictors, classes=9, seq_len=1024):
+    def __init__(self, num_predictors, classes=9, seq_len=1024, device="cpu"):
         super(FCNN, self).__init__()
         self.classes = classes
         self.seq_len = seq_len
@@ -25,7 +25,7 @@ class FCNN(nn.Module):
         return x
     
 class CNN(nn.Module):
-    def __init__(self, num_predictors, classes=9, seq_len=1024):
+    def __init__(self, num_predictors, classes=9, seq_len=1024, device="cpu"):
         super(CNN, self).__init__()
         self.classes = classes
         self.predictors = num_predictors
@@ -48,7 +48,7 @@ class CNN(nn.Module):
         return out
     
 class RNN(nn.Module):
-    def __init__(self, num_predictors, classes=9, seq_len=1024):
+    def __init__(self, num_predictors, classes=9, seq_len=1024, device="cpu"):
         super(RNN, self).__init__()
         self.classes = classes
         self.seq_len = seq_len
@@ -74,9 +74,10 @@ class RNN(nn.Module):
     
 class TNN(nn.Module):
     def __init__(self, num_predictors, classes=9, seq_len=1024, d_model = 32, nhead = 2, d_hid = 128,
-                 nlayers = 2, dropout = 0.5):
+                 nlayers = 2, dropout = 0.5, device="cpu"):
         super(TNN, self).__init__()
-        self.pos_encoder = PosEncoding(d_model, dropout, seq_len)
+        self.device = device
+        self.pos_encoder = PosEncoding(d_model, dropout, seq_len, self.device)
         encoder_layers = nn.TransformerEncoderLayer(d_model, nhead, d_hid, dropout, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layers, nlayers)
         self.embedding = nn.Embedding(classes, d_model)
@@ -109,12 +110,12 @@ class TNN(nn.Module):
         return out.permute(0,2,1)
 
 class PosEncoding(nn.Module):
-    def __init__(self, d_model: int, dropout: float, max_len: int):
+    def __init__(self, d_model: int, dropout: float, max_len: int, device="cpu"):
         super(PosEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
         position = torch.arange(max_len).unsqueeze(1)
         div_term = torch.exp(torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model)).unsqueeze(0)
-        self.pe = torch.zeros(max_len, d_model).to(self.device)
+        self.pe = torch.zeros(max_len, d_model).to(device)
         self.pe[:, 0::2] = torch.sin(position * div_term)
         self.pe[:, 1::2] = torch.cos(position * div_term)
 
@@ -171,9 +172,9 @@ class CustomDataset(Dataset):
         return len(self.y)
 
 class LitModel(L.LightningModule):
-    def __init__(self, nnModel, win_size, max_len):
+    def __init__(self, nnModel, win_size, max_len, predictors):
         super().__init__()
-        self.nnModel = nnModel
+        self.nnModel = nnModel(predictors, seq_len=win_size, device=self.device)
         self.win_size = win_size
         self.max_len = max_len
 

@@ -35,8 +35,7 @@ def commands(args, X, y):
     train_set, val_set = random_split(ds, [0.9, 0.1])
     train_dataloader = DataLoader(train_set, shuffle=True, batch_size=4)
     val_dataloader = DataLoader(val_set)
-    model = args.NNModel(args.predictors, seq_len=args.win_len)
-    l_model = LitModel(model, args.win_len, args.seq_len)
+    l_model = LitModel(args.NNModel, args.win_len, args.seq_len, args.predictors)
     trainer = L.Trainer(default_root_dir=f"{out_dir}/nn/",
                         max_epochs=100,
                         callbacks=[EarlyStopping(monitor="val_acc", mode="max", patience=10,  min_delta=0.0001),

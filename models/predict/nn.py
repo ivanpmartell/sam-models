@@ -19,8 +19,6 @@ def parse_commandline():
                     help='Type of neural network model to use')
     parser.add_argument('--params', type=str, required=True,
                     help='Pretrained parameters (checkpoint) file')
-    parser.add_argument('--predictors', type=int, required=True,
-                    help='Amount of predictors in input data')
     parser.add_argument('--win_len', type=int, default=1024,
                     help='Length of the window to be used')
     parser.add_argument('--seq_len', type=int, default=1024,
@@ -64,8 +62,7 @@ def commands(args, predictions, mut_position=None):
     first_pred = next(iter(predictions.values()))
     preds_len = len(first_pred.seq)
     X = torch.Tensor(preprocess(predictions.values()))
-    model = args.NNModel(args.predictors, seq_len=args.win_len)
-    trained_model = LitModel.load_from_checkpoint(args.params, nnModel=model, win_size=args.win_len, max_len=args.seq_len)
+    trained_model = LitModel.load_from_checkpoint(args.params, nnModel=args.NNModel, win_size=args.win_len, max_len=args.seq_len, predictors=args.predictors)
     pred = predict(args, X, trained_model)
     result = ""
     q8_ss = get_ss_q8()
@@ -79,6 +76,7 @@ def main():
     args = parse_commandline()
     args.NNModel = select_model(args.model)
     predictors = choose_methods(args.methods)
+    args.predictors = len(predictors)
     work_on_predicting(args, commands, predictors)
 
 main()

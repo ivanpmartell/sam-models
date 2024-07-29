@@ -32,8 +32,7 @@ def commands(args, X, y):
     out_dir = os.path.dirname(args.out_file)
     ds = CustomDataset(X, y, x_transform=onehot_preprocess)
     test_dataloader = DataLoader(ds, batch_size=1)
-    model = args.NNModel(args.predictors, seq_len=args.win_len)
-    trained_model = LitModel.load_from_checkpoint(args.params, nnModel=model, win_size=args.win_len, max_len=args.seq_len)
+    trained_model = LitModel.load_from_checkpoint(args.params, nnModel=args.NNModel, win_size=args.win_len, max_len=args.seq_len, predictors=args.predictors)
     trainer = L.Trainer(default_root_dir=f"{out_dir}/nn/", num_sanity_val_steps=0)
     return trainer.test(model=trained_model, dataloaders=test_dataloader)
 
