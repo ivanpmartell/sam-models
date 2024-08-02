@@ -76,8 +76,7 @@ class TNN(nn.Module):
     def __init__(self, num_predictors, classes=9, seq_len=1024, d_model = 32, nhead = 2, d_hid = 128,
                  nlayers = 2, dropout = 0.5):
         super(TNN, self).__init__()
-        self.device = device
-        self.pos_encoder = PosEncoding(d_model, dropout, seq_len, self.device)
+        self.pos_encoder = PosEncoding(d_model, dropout, seq_len)
         encoder_layers = nn.TransformerEncoderLayer(d_model, nhead, d_hid, dropout, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layers, nlayers)
         self.embedding = nn.Embedding(classes, d_model)
