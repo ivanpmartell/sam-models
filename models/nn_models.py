@@ -97,10 +97,11 @@ class TNN(nn.Module):
             src_list.append(src[:,:,i])
         out_list = []
         for src in src_list:
-            src = self.embedding(src) * math.sqrt(self.d_model)
+            device = "cpu" if src.get_device() < 0 else f"cuda:{src.get_device()}"
+            src = self.embedding(src).to(device) * math.sqrt(self.d_model)
             src = self.pos_encoder(src)
             if src_mask is None:
-                src_mask = nn.Transformer.generate_square_subsequent_mask(src.shape[1], device=src.get_device())
+                src_mask = nn.Transformer.generate_square_subsequent_mask(src.shape[1], device=device)
             output = self.transformer_encoder(src, src_mask)
             out_list.append(self.linear(output))
         out = torch.zeros_like(out_list[0])
@@ -119,7 +120,8 @@ class PosEncoding(nn.Module):
         self.pe[:, 1::2] = torch.cos(position * div_term)
 
     def forward(self, x):
-        out = x + self.pe[:x.size(1)].to(x.get_device())
+        device = "cpu" if x.get_device() < 0 else f"cuda:{x.get_device()}"
+        out = x + self.pe[:x.size(1)].to(device)
         return self.dropout(out)
 
 def select_model(model: str) -> callable:
