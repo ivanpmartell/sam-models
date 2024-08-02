@@ -91,14 +91,14 @@ class TNN(nn.Module):
         self.linear.weight.data.uniform_(-initrange, initrange)
 
     def forward(self, x, src_mask = None):
+        device = "cpu" if x.get_device() < 0 else f"cuda:{x.get_device()}"
         src = x.argmax(1)
         src_list = []
         for i in range(x.shape[-1]):
             src_list.append(src[:,:,i])
         out_list = []
         for src in src_list:
-            device = "cpu" if src.get_device() < 0 else f"cuda:{src.get_device()}"
-            src = self.embedding(src).to(device) * math.sqrt(self.d_model)
+            src = self.embedding(src) * math.sqrt(self.d_model)
             src = self.pos_encoder(src)
             if src_mask is None:
                 src_mask = nn.Transformer.generate_square_subsequent_mask(src.shape[1], device=device)

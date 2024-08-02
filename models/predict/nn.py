@@ -7,7 +7,7 @@ sys.path.insert(1, os.path.dirname(os.path.dirname(sys.path[0])))
 sys.path.insert(1, os.path.dirname(sys.path[0]))
 from common import *
 from data_preprocess import onehot_preprocess, nominal_data
-from nn_models import select_model, LitModel
+from nn_models import select_model, LitModel, select_device
 
 def parse_commandline():
     parser = argparse.ArgumentParser(description='Mutation secondary structure neural network predictor')
@@ -61,7 +61,7 @@ def predict(args, X, trained_model):
 def commands(args, predictions, mut_position=None):
     first_pred = next(iter(predictions.values()))
     preds_len = len(first_pred.seq)
-    X = torch.Tensor(preprocess(predictions.values()))
+    X = torch.Tensor(preprocess(predictions.values())).to(select_device())
     trained_model = LitModel.load_from_checkpoint(args.params, nnModel=args.NNModel, win_size=args.win_len, max_len=args.seq_len, predictors=args.predictors)
     pred = predict(args, X, trained_model)
     result = ""
