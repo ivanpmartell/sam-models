@@ -85,14 +85,16 @@ def missing_output_is_input(args, abs_input):
         abs_output_dir = os.path.abspath(args.out_dir)
     return abs_output_dir
 
-def work_on_predicting(args, cmds, predictors):
+def work_on_predicting(args, cmds, predictors, dir_name=""):
     abs_input_dir = os.path.abspath(args.dir)
     abs_output_dir = missing_output_is_input(args, abs_input_dir)
+    if not dir_name:
+        dir_name = f"{args.model}_{args.methods}"
     for f in Path(abs_input_dir).rglob(f"*{args.seq_ext}"):
         cluster_dir = os.path.dirname(f)
         f_basename = os.path.basename(f)
         protein = f_basename[0:f_basename.index('.')]
-        out_dir = keep_input_dir_structure(abs_input_dir, abs_output_dir, cluster_dir, f"{args.model}_{args.methods}")
+        out_dir = keep_input_dir_structure(abs_input_dir, abs_output_dir, cluster_dir, dir_name)
         out_file = os.path.join(out_dir, f"{protein}{args.pred_ext}")
         if not os.path.exists(out_file):
             predictions = dict()

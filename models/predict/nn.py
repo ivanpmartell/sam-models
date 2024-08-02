@@ -69,7 +69,7 @@ def commands(args, predictions, mut_position=None):
     for i in (pred.argmax(1))[0,:preds_len]:
         result += q8_ss[i]
     id_split = first_pred.id.split('_')
-    out_id = f"{id_split[0]}_{id_split[1]}_{args.methods}_{args.model}"
+    out_id = f"{id_split[0]}_{id_split[1]}_{args.methods}_{args.model}_{args.win_len}"
     return {out_id: result}
 
 def main():
@@ -77,6 +77,6 @@ def main():
     args.NNModel = select_model(args.model)
     predictors = choose_methods(args.methods)
     args.predictors = len(predictors)
-    work_on_predicting(args, commands, predictors)
+    work_on_predicting(args, commands, predictors, dir_name=f"{args.model}_{args.methods}_{args.win_len}")
 
 main()
