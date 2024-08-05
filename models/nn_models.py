@@ -11,8 +11,11 @@ class FCNN(nn.Module):
         self.classes = classes
         self.seq_len = seq_len
         self.hidden = nn.Sequential(nn.Linear(seq_len*num_predictors*classes, seq_len*classes),
+                                    nn.BatchNorm1d(seq_len*classes),
                                     nn.ReLU(),
+                                    nn.Dropout(0.5),
                                     nn.Linear(seq_len*classes, seq_len),
+                                    nn.BatchNorm1d(seq_len),
                                     nn.ReLU(),
                                     nn.Dropout(0.5))
         self.out = nn.Linear(seq_len, seq_len*classes)

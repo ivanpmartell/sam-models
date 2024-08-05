@@ -61,7 +61,7 @@ def predict(args, X, trained_model):
 def commands(args, predictions, mut_position=None):
     first_pred = next(iter(predictions.values()))
     preds_len = len(first_pred.seq)
-    X = torch.Tensor(preprocess(predictions.values())).to(select_device())
+    X = torch.Tensor(preprocess(predictions.values())).to(select_device(False))
     trained_model = LitModel.load_from_checkpoint(args.params, nnModel=args.NNModel, win_size=args.win_len, max_len=args.seq_len, predictors=args.predictors)
     pred = predict(args, X, trained_model)
     result = ""
