@@ -33,7 +33,7 @@ def commands(args, X, y):
     out_fname = remove_ckpt_ext(os.path.basename(args.out_file))
     ds = CustomDataset(X, y, x_transform=onehot_preprocess)
     train_set, val_set = random_split(ds, [0.9, 0.1])
-    train_dataloader = DataLoader(train_set, shuffle=True, batch_size=12)
+    train_dataloader = DataLoader(train_set, shuffle=True, batch_size=16)
     val_dataloader = DataLoader(val_set)
     l_model = LitModel(args.NNModel, args.win_len, args.seq_len, args.predictors)
     trainer = L.Trainer(default_root_dir=f"{out_dir}/nn/",

@@ -10,23 +10,19 @@ class FCNN(nn.Module):
         super(FCNN, self).__init__()
         self.classes = classes
         self.seq_len = seq_len
-        self.hidden = nn.Sequential(nn.Linear(seq_len*num_predictors*classes, seq_len*classes),
-                                    nn.BatchNorm1d(seq_len*classes),
+        self.hidden = nn.Sequential(nn.Linear(classes*seq_len*num_predictors, classes*seq_len*num_predictors),
+                                    nn.BatchNorm1d(classes*seq_len*num_predictors),
                                     nn.ReLU(),
-                                    nn.Dropout(0.5),
-                                    nn.Linear(seq_len*classes, seq_len*classes),
-                                    nn.BatchNorm1d(seq_len*classes),
+                                    nn.Dropout(0.2),
+                                    nn.Linear(classes*seq_len*num_predictors, classes*seq_len),
+                                    nn.BatchNorm1d(classes*seq_len),
                                     nn.ReLU(),
-                                    nn.Dropout(0.5),
-                                    nn.Linear(seq_len*classes, seq_len),
+                                    nn.Dropout(0.2),
+                                    nn.Linear(classes*seq_len, seq_len),
                                     nn.BatchNorm1d(seq_len),
                                     nn.ReLU(),
-                                    nn.Dropout(0.5),
-                                    nn.Linear(seq_len, seq_len),
-                                    nn.BatchNorm1d(seq_len),
-                                    nn.ReLU(),
-                                    nn.Dropout(0.5))
-        self.out = nn.Linear(seq_len, seq_len*classes)
+                                    nn.Dropout(0.2))
+        self.out = nn.Linear(seq_len, classes*seq_len)
 
     def forward(self, x):
         bsize = x.shape[0]
@@ -42,13 +38,25 @@ class CNN(nn.Module):
         self.predictors = num_predictors
         self.seq_len = seq_len
         self.conv1 = nn.Sequential(nn.Conv2d(in_channels=classes,
-                                            out_channels=classes, kernel_size=(5,17), padding='same'),
+                                            out_channels=64, kernel_size=(21,(num_predictors*2)-1), padding='same'),
+                                    nn.BatchNorm2d(64),
                                     nn.ReLU(),
-                                    nn.Dropout(0.2))
-        self.hidden = nn.Sequential(nn.Linear(classes*seq_len*num_predictors, seq_len*classes),
+                                    nn.Dropout(0.2),
+                                    nn.Conv2d(in_channels=64,
+                                            out_channels=32, kernel_size=(11,(num_predictors*2)-1), padding='same'),
+                                    nn.BatchNorm2d(32),
+                                    nn.ReLU(),
+                                    nn.Dropout(0.2),
+                                    nn.Conv2d(in_channels=32,
+                                            out_channels=16, kernel_size=(3,(num_predictors*2)-1), padding='same'),
+                                    nn.BatchNorm2d(16),
+                                    nn.ReLU(),
+                                    nn.Dropout(0.2),)
+        self.hidden = nn.Sequential(nn.Linear(16*seq_len*num_predictors, classes*seq_len),
+                                    nn.BatchNorm1d(classes*seq_len),
                                     nn.ReLU(),
                                     nn.Dropout(0.5))
-        self.out = nn.Linear(seq_len*classes, seq_len*classes)
+        self.out = nn.Linear(classes*seq_len, classes*seq_len)
 
     def forward(self, x):
         bsize = x.shape[0]
@@ -65,16 +73,18 @@ class RNN(nn.Module):
         self.seq_len = seq_len
         self.predictors = num_predictors
         self.bilstm = nn.LSTM(
-            seq_len, 32, 2, bias=True,
-            batch_first=True, dropout=0.5, bidirectional=True)
-        self.fc1 = nn.Sequential(nn.Linear(32*2*classes*num_predictors, seq_len*classes),
+            classes, 32, 2, bias=True,
+            batch_first=True, dropout=0.1, bidirectional=True)
+        self.fc1 = nn.Sequential(nn.Linear(32*2*seq_len*num_predictors, seq_len*classes),
+                                 nn.BatchNorm1d(seq_len*classes),
                                  nn.ReLU(),
                                  nn.Dropout(0.5))
         self.fc2 = nn.Linear(seq_len*classes, seq_len*classes)
 
     def forward(self, x):
         bsize = x.shape[0]
-        rnns =[]
+        x = x.permute(0,2,1,3)
+        rnns = []
         for i in range(self.predictors):
             rnn, _ = self.bilstm(x[:,:,:,i])
             rnns.append(rnn)
