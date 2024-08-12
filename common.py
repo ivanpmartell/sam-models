@@ -13,6 +13,9 @@ import pickle
 def get_ss_q8():
     return "_BCEGHIST"
 
+def get_ss_q8_pred():
+    return "CBCEGHIST"
+
 def ss_index(c):
     if c == 'B':
         return 1

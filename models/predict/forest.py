@@ -55,13 +55,10 @@ def commands(args, predictions, mut_position=None):
     with open(args.params, 'rb') as f:
         cls = pickle.load(f)
     result = ""
-    q8_ss = get_ss_q8()
+    q8_ss = get_ss_q8_pred()
     for i in range(preds_len):
         y_hat = cls.predict(X[i].reshape(1, -1))
-        cur_ss = q8_ss[int(y_hat.item())]
-        if cur_ss == "_":
-            cur_ss = "C"
-        result += cur_ss
+        result += q8_ss[int(y_hat.item())]
     id_split = first_pred.id.split('_')
     out_id = f"{id_split[0]}_{id_split[1]}_{args.methods}_{args.model}"
     return {out_id: result}

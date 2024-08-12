@@ -39,7 +39,7 @@ def parse_commandline():
 def preprocess(X):
     X = nominal_data(X, numtype=int)
     X = np.expand_dims(X, axis=0)
-    return onehot_preprocess(X)
+    return torch.Tensor(onehot_preprocess(X)).to(select_device(False))
 
 def predict(args, X, trained_model):
     trained_model.eval()
@@ -48,10 +48,10 @@ def predict(args, X, trained_model):
         seq_chunk = args.win_len
         for i in range(args.seq_len // seq_chunk):
             input_cut = X[:,:,i*seq_chunk:(i+1)*seq_chunk]
-            completely_masked = torch.zeros_like(input_cut)
+            completely_masked = torch.zeros_like(input_cut, device=select_device(False))
             completely_masked[:,0,:,:] = 1
             if torch.equal(input_cut, completely_masked):
-                empty_chunk = torch.zeros_like(y_hat[0])
+                empty_chunk = torch.zeros_like(y_hat[0], device=select_device(False))
                 empty_chunk[:,0,:] = 1
                 y_hat.append(empty_chunk)
             else:
@@ -61,11 +61,11 @@ def predict(args, X, trained_model):
 def commands(args, predictions, mut_position=None):
     first_pred = next(iter(predictions.values()))
     preds_len = len(first_pred.seq)
-    X = torch.Tensor(preprocess(predictions.values())).to(select_device(False))
+    X = preprocess(predictions.values())
     trained_model = LitModel.load_from_checkpoint(args.params, nnModel=args.NNModel, win_size=args.win_len, max_len=args.seq_len, predictors=args.predictors)
     pred = predict(args, X, trained_model)
     result = ""
-    q8_ss = get_ss_q8()
+    q8_ss = get_ss_q8_pred()
     for i in (pred.argmax(1))[0,:preds_len]:
         result += q8_ss[i]
     id_split = first_pred.id.split('_')
