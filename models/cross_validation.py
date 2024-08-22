@@ -28,7 +28,7 @@ def parse_commandline():
 
 def select_model(model):
     model = model.lower()
-    if "forest" in model:
+    if "randomforest" or "decisiontree" or "extratree" in model:
         return "{0}/forest.py"
     elif "fullyconnected" in model:
         return "{0}/nn.py"
@@ -39,7 +39,7 @@ def select_model(model):
     elif "transformer" in model:
         return "{0}/nn.py"
     else:
-        print("Incorrect model, please choose: Forest, FullyConnected, Convolutional, Recurrent, Transformer")
+        print("Incorrect model, please choose: RandomForest, DecisionTree, ExtraTree, FullyConnected, Convolutional, Recurrent, Transformer")
         exit(1)
 
 def pipeline(args):

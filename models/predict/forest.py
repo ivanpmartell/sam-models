@@ -1,8 +1,6 @@
 import sys
 import os
 import argparse
-from sklearn.ensemble import BaggingClassifier
-from sklearn.tree import ExtraTreeClassifier
 import numpy as np
 import pickle
 
@@ -66,6 +64,7 @@ def commands(args, predictions, mut_position=None):
 def main():
     args = parse_commandline()
     predictors = choose_methods(args.methods)
+    args.model = args.model.lower()
     args.preprocess = choose_preprocess(args.preprocess)
     work_on_predicting(args, commands, predictors)
 

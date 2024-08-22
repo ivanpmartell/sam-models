@@ -1,9 +1,6 @@
 import sys
 import os
 import argparse
-from sklearn.ensemble import BaggingClassifier
-from sklearn.tree import ExtraTreeClassifier
-import numpy as np
 import pickle
 
 sys.path.insert(1, os.path.dirname(os.path.dirname(sys.path[0])))
@@ -48,6 +45,7 @@ def commands(args, X, y):
 
 def main():
     args = parse_commandline()
+    args.model = args.model.lower()
     args.preprocess = choose_preprocess(args.preprocess)
     work_on_testing(args, commands)
 
