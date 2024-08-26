@@ -29,7 +29,7 @@ def parse_commandline():
 def select_model(model):
     model = model.lower()
     if "randomforest" or "decisiontree" or "extratree" in model:
-        return "{0}/forest.py"
+        return "{0}/trees.py"
     elif "fullyconnected" in model:
         return "{0}/nn.py"
     elif "convolutional" in model:

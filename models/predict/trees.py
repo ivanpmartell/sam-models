@@ -34,9 +34,11 @@ def parse_commandline():
                     help='Type of preprocessing for input data. Choices: nominal_location, frequency_location, frequency_max_location')
     parser.add_argument('--model', type=str, default="forest",
                     help='Name to use for this model')
+    parser.add_argument('--win_side_len', type=int,
+                    help='Size of window for input.')
     return parser.parse_args()
 
-def preprocess(X, mut_position, max_len, pprocess):
+def preprocess(X, mut_position, max_len, pprocess, win_side_len):
     if mut_position is not None:
         X = mutation_nominal_data(X, mut_position)
         X = np.expand_dims(X, axis=0)
@@ -44,12 +46,16 @@ def preprocess(X, mut_position, max_len, pprocess):
     else:
         X = nominal_data(X, numtype=int)
         X = np.expand_dims(X, axis=0)
-        return pprocess(X, max_len)
+        if win_side_len is not None:
+            X = pprocess(X, max_len, win_side_len)
+        else:
+            X = pprocess(X, max_len)
+        return X
 
 def commands(args, predictions, mut_position=None):
     first_pred = next(iter(predictions.values()))
     preds_len = len(first_pred.seq)
-    X = preprocess(predictions.values(), mut_position, args.seq_len, args.preprocess)
+    X = preprocess(predictions.values(), mut_position, args.seq_len, args.preprocess, args.win_side_len)
     with open(args.params, 'rb') as f:
         cls = pickle.load(f)
     result = ""
