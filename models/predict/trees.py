@@ -72,6 +72,6 @@ def main():
     predictors = choose_methods(args.methods)
     args.model = args.model.lower()
     args.preprocess = choose_preprocess(args.preprocess)
-    work_on_predicting(args, commands, predictors)
+    work_on_predicting(args, commands, predictors, dir_name=f"{args.model}_{args.methods}_{1+(args.win_side_len*2)}")
 
 main()
