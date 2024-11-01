@@ -96,6 +96,7 @@ def work_on_predicting(args, cmds, predictors, dir_name=""):
     for f in Path(abs_input_dir).rglob(f"*{args.seq_ext}"):
         cluster_dir = os.path.dirname(f)
         f_basename = os.path.basename(f)
+        print(f"Working on {f_basename}")
         protein = f_basename[0:f_basename.index('.')]
         out_dir = keep_input_dir_structure(abs_input_dir, abs_output_dir, cluster_dir, dir_name)
         out_file = os.path.join(out_dir, f"{protein}{args.pred_ext}")
