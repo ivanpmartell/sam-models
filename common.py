@@ -102,10 +102,19 @@ def work_on_predicting(args, cmds, predictors, dir_name=""):
         out_file = os.path.join(out_dir, f"{protein}{args.pred_ext}")
         if not os.path.exists(out_file):
             predictions = dict()
+            all_predictors_found = True
+            missing_predictors = []
             for predictor in predictors:
                 prediction_path = os.path.join(cluster_dir, predictor, f"{protein}{args.pred_ext}")
-                predictions[predictor] = get_single_record_fasta(prediction_path)
-            #assignment = get_single_record_fasta(f)
+                if not os.path.exists(prediction_path):
+                    all_predictors_found = False
+                    missing_predictors.append(predictor)
+                else:
+                    predictions[predictor] = get_single_record_fasta(prediction_path)
+            if not all_predictors_found:
+                print(f"Skipping {f_basename}: Required method predictions missing.")
+                print(missing_predictors)
+                continue
             if args.mutation_file:
                 mut_path = os.path.join(cluster_dir, args.mutation_file)
                 all_mutations = read_mutations(mut_path)
@@ -118,6 +127,8 @@ def work_on_predicting(args, cmds, predictors, dir_name=""):
                 mut_position = None
             output = cmds(args, predictions, mut_position)
             write_fasta(out_file, output)
+        else:
+            print("Skipping {f_basename}: Prediction already exists.")
 
 def work_on_training(args, cmds):
     abs_input = os.path.abspath(args.input)
