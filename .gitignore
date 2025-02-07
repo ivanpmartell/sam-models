@@ -7,6 +7,7 @@
 *.yaml
 *.csv
 *.png
+*.dcn
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

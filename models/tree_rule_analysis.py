@@ -10,12 +10,16 @@ def parse_commandline():
                     help='Folder containing Tree rule (text) files')
     parser.add_argument('--ext', type=str, default="log",
                     help='Extension of the text files')
+    parser.add_argument('--percentage', action="store_true", 
+                    help='Get results as percentage values')
     return parser.parse_args()
 
-def pretty_print(dic):
+def pretty_print(dic, percent):
+    if percent:
+        np.set_printoptions(formatter={'float_kind':lambda x: "%.1f" % x + "%"})
     sorted_keys = sorted(dic.keys())
     for key in sorted_keys:
-        print(f"\"{key}\": {np.array2string(dic[key], separator=', ')}")
+        print(f"\"{key}\": {np.array2string(dic[key], separator=', ', precision=1, floatmode='fixed', suppress_small=True)}")
 
 def main():
     args = parse_commandline()
@@ -40,7 +44,10 @@ def main():
                     class_weights[class_str] = weights
     for key in class_weights:
         class_weights[key] = np.uint64(class_weights[key] / current_file)
-    pretty_print(class_weights)
+        if args.percentage:
+            class_sum = np.sum(class_weights[key])
+            class_weights[key] = np.float64(class_weights[key]) / class_sum * 100
+    pretty_print(class_weights, args.percentage)
 
 
 main()
