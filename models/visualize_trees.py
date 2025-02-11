@@ -9,7 +9,7 @@ sys.path.insert(1, os.path.dirname(sys.path[0]))
 from common import get_ss_q8_pred
 
 def parse_commandline():
-    parser = argparse.ArgumentParser(description='Neural network testing script')
+    parser = argparse.ArgumentParser(description='Tree visualizations')
     parser.add_argument('params', type=str,
                     help='Pretrained parameters (checkpoint) file')
     parser.add_argument('--out_dir', type=str,

@@ -7,7 +7,7 @@ sys.path.insert(1, os.path.dirname(sys.path[0]))
 from common import *
 
 def parse_commandline():
-    parser = argparse.ArgumentParser(description='Random forest training script')
+    parser = argparse.ArgumentParser(description='Cross validation script')
     parser.add_argument('input', type=str,
                     help='Input folder with the cluster data')
     parser.add_argument('--out_dir', type=str, required=True,

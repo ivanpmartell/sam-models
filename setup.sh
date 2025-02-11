@@ -7,4 +7,4 @@ rm -f ~/miniconda3/miniconda.sh
 exec bash
 conda activate sam
 pip install torch --index-url https://download.pytorch.org/whl/cpu
-pip install biopython scikit-learn pandas lightning matplotlib
+pip install biopython scikit-learn pandas lightning matplotlib argparse
