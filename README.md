@@ -75,3 +75,44 @@ The knowledge can be extracted through three scripts
 - `models/tree_rule_analysis.py`: Utilizes the text visualization to create a confusion matrix of the secondary structure classes that the tree can predict.
 
 - `models/tree_decisions.py`: Creates a list of human-readable decisions that the tree takes to predict a certain secondary structure class.
+
+## Help and Citation
+
+All runnable python scripts contain a help manual which can be accessed with the `--help` paramater. For example,
+
+```python models/data.py --help```
+
+will produce the following manual:
+
+```
+usage: data.py [-h] [--out_dir OUT_DIR] [--pred_ext PRED_EXT] [--assign_ext ASSIGN_EXT] [--mutation_file MUTATION_FILE] [--methods METHODS] [--split_type SPLIT_TYPE] [--split_size SPLIT_SIZE] dir
+
+Script to preprocess data for machine learning use
+
+positional arguments:
+  dir                   Input directory containing clusters
+
+options:
+  -h, --help            show this help message and exit
+  --out_dir OUT_DIR     Output directory to save numpy data. Ignore to use input directory
+  --pred_ext PRED_EXT   Extension of ss prediction files
+  --assign_ext ASSIGN_EXT
+                        Extension of ss assigned files
+  --mutation_file MUTATION_FILE
+                        Filename of mutation files. Usually "mutations.txt". Leave empty to not use mutation data
+  --methods METHODS     Keyword or Comma separated list of methods to include in prediction. Keywords: all, top, avg, low
+  --split_type SPLIT_TYPE
+                        Method of splitting the data. Keywords: kfold, train_test
+  --split_size SPLIT_SIZE
+                        Amount of data to split. Values: kfold=1 to 100, train_test=0 to 1
+```
+
+For any questions, please submit a post in the `Issues` tab above.
+
+More information can be found in our research article [here] (#TBD).
+
+If you found our work useful, please cite:
+
+```
+TDB
+```
