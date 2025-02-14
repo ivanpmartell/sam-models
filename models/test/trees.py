@@ -9,7 +9,7 @@ from common import *
 from data_preprocess import single_target_preprocess, choose_preprocess
 
 def parse_commandline():
-    parser = argparse.ArgumentParser(description='Random forest testing script')
+    parser = argparse.ArgumentParser(description='Tree-type testing script')
     parser.add_argument('input', type=str,
                     help='Input file containing data in npz format')
     parser.add_argument('--out_dir', type=str,

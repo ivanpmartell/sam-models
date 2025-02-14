@@ -1,8 +1,10 @@
 import sys
 import os
 import argparse
-from sklearn.ensemble import BaggingClassifier, RandomForestClassifier
-from sklearn.tree import ExtraTreeClassifier, DecisionTreeClassifier
+import pickle
+from interpret import show, set_visualize_provider
+from interpret.provider import DashProvider
+set_visualize_provider(DashProvider.from_address(('127.0.0.1', 7001)))
 
 sys.path.insert(1, os.path.dirname(os.path.dirname(sys.path[0])))
 sys.path.insert(1, os.path.dirname(sys.path[0]))
@@ -10,13 +12,15 @@ from common import *
 from data_preprocess import single_target_preprocess, choose_preprocess
 
 def parse_commandline():
-    parser = argparse.ArgumentParser(description='Tree-type training script')
+    parser = argparse.ArgumentParser(description='Whitebox testing script')
     parser.add_argument('input', type=str,
                     help='Input file containing data in npz format')
     parser.add_argument('--out_dir', type=str,
-                    help='Base directory where trained parameters will be saved. Leave empty to use input directory')
-    parser.add_argument('--model', type=str, default="extratree",
-                    help='Type of tree model to use. Choices: ExtraTree, RandomForest, DecisionTree')
+                    help='Base directory where scoring metric results will be saved. Leave empty to use params directory')
+    parser.add_argument('--model', type=str, default="ebm",
+                    help='Name to use for this model')
+    parser.add_argument('--params', type=str, required=True,
+                    help='Pretrained parameters (checkpoint) file')
     parser.add_argument('--preprocess', type=str, default="frequency_max_location",
                     help='Type of preprocessing for input data. Choices: nominal_location, frequency_location, frequency_max_location')
     parser.add_argument('--seq_len', type=int, default=1024,
@@ -25,7 +29,7 @@ def parse_commandline():
                     help='Size of window for input.')
     return parser.parse_args()
 
-#For X: use any location preprocesses or nominal_windowed
+#Also use nominal_location_preprocess or frequency_max_location_preprocess
 def transform_data(X, y, preprocess, max_len, win_side_len):
     if win_side_len is not None:
         X = preprocess(X, max_len, win_side_len)
@@ -36,21 +40,18 @@ def transform_data(X, y, preprocess, max_len, win_side_len):
 
 def commands(args, X, y):
     X, y = transform_data(X, y, args.preprocess, args.seq_len, args.win_side_len)
-    if "extratree" in args.model:
-        extra_tree = ExtraTreeClassifier()
-        cls = BaggingClassifier(extra_tree).fit(X, y)
-    elif "randomforest" in args.model:
-        cls = RandomForestClassifier().fit(X,y)
-    elif "decisiontree" in args.model:
-        cls = DecisionTreeClassifier().fit(X,y)
-    else:
-        raise ValueError("Wrong model type. Please choose one of ExtraTree, RandomForest, DecisionTree")
-    write_classifier(args.out_file, cls)
+    with open(args.params, 'rb') as f:
+        cls = pickle.load(f)
+    test_acc = cls.score(X, np.char.mod('%d.0', y))
+    print(f"Accuracy: {test_acc}")
+    show(cls.explain_global())
+    return test_acc
 
 def main():
     args = parse_commandline()
     args.model = args.model.lower()
     args.preprocess = choose_preprocess(args.preprocess)
-    work_on_training(args, commands)
+    work_on_testing(args, commands)
 
 main()
+input("Press Enter to exit...")

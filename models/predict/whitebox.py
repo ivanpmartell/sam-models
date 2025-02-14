@@ -10,7 +10,7 @@ from common import *
 from data_preprocess import nominal_data, mutation_nominal_data, nominal_location_preprocess, choose_preprocess
 
 def parse_commandline():
-    parser = argparse.ArgumentParser(description='Mutation secondary structure tree-type predictor')
+    parser = argparse.ArgumentParser(description='Mutation secondary structure whitebox predictor')
     parser.add_argument('dir', type=str,
                     help='Input directory containing clusters')
     parser.add_argument('--out_dir', type=str,
@@ -32,7 +32,7 @@ def parse_commandline():
                     help='Maximum sequence length of inputs.')
     parser.add_argument('--preprocess', type=str, default="frequency_max_location",
                     help='Type of preprocessing for input data. Choices: nominal_location, frequency_location, frequency_max_location')
-    parser.add_argument('--model', type=str, default="forest",
+    parser.add_argument('--model', type=str, default="ebm",
                     help='Name to use for this model')
     parser.add_argument('--win_side_len', type=int,
                     help='Size of window for input.')
@@ -62,7 +62,7 @@ def commands(args, predictions, mut_position=None):
     q8_ss = get_ss_q8_pred()
     for i in range(preds_len):
         y_hat = cls.predict(X[i].reshape(1, -1))
-        result += q8_ss[int(y_hat.item())]
+        result += q8_ss[int(float(y_hat.item()))]
     id_split = first_pred.id.split('_')
     out_id = f"{id_split[0]}_{id_split[1]}_{args.methods}_{args.model}"
     return {out_id: result}
